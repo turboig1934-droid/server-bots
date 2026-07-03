@@ -1,6 +1,7 @@
-# Minecraft protocol - use correct version
+# Minecraft protocol - stable working version
 minecraft-protocol==1.12.0
 aiohttp==3.9.1
 requests==2.31.0
 pytest==7.4.3
 asyncio==3.4.3
+cryptography==41.0.7
