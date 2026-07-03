@@ -4,10 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       runners_count:
-        description: 'Number of runners to spawn'
+        description: 'Number of runners'
         required: true
         default: '3'
-        type: choice
         options:
           - '1'
           - '2'
@@ -20,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        runner: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-      max-parallel: 5
+        runner: [1, 2, 3, 4, 5]
+      max-parallel: 3
     
     steps:
       - name: Checkout code
@@ -32,18 +31,9 @@ jobs:
         with:
           node-version: '18'
           
-      - name: Cache Node.js modules
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('package.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-            
       - name: Install dependencies
         run: |
           npm install mineflayer
-          npm install minecraft-protocol
           
       - name: Create config
         run: |
@@ -58,35 +48,25 @@ jobs:
             "video_helper_mode": true,
             "command_prefix": "!",
             "max_bots": 100,
-            "registration_password": null,
             "server_version": "1.16.5"
           }
           EOF
           
       - name: Set runner ID
         run: |
-          echo "RUNNER_ID=${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_${GITHUB_JOB}_${{ matrix.runner }}" >> $GITHUB_ENV
-          
-      - name: Create bot script
-        run: |
-          cat > bot.js << 'EOF'
-          # Paste the bot.js content here (the full script above)
-          EOF
+          echo "RUNNER_ID=${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_${{ matrix.runner }}" >> $GITHUB_ENV
           
       - name: Run bot
         env:
           RUNNER_ID: ${{ env.RUNNER_ID }}
-        timeout-minutes: 300
         run: |
           echo "🤖 Starting bot runner ${{ matrix.runner }}"
-          echo "🏷️ Runner ID: ${{ env.RUNNER_ID }}"
           node bot.js
           
-      - name: Keep runner alive
+      - name: Keep alive
         if: always()
         run: |
-          echo "⏳ Keeping runner alive..."
           while true; do
-            echo "🔄 Runner ${{ matrix.runner }} is alive - $(date)"
+            echo "Runner ${{ matrix.runner }} is alive"
             sleep 300
           done
