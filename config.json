@@ -2,8 +2,7 @@
     "server_ip": "node.harshteotia.in",
     "server_port": 25566,
     "bots_per_runner": 10,
-    "bot_spawn_delay": 1000,
+    "bot_spawn_delay": 500,
     "max_bots": 10,
-    "server_version": "1.16.5",
-    "command_prefix": "!"
+    "server_version": "1.16.5"
 }
