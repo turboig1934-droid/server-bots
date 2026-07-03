@@ -4,22 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       runners_count:
-        description: 'Number of runners'
+        description: 'Number of runners to spawn'
         required: true
         default: '3'
+        type: choice
         options:
           - '1'
           - '2'
           - '3'
           - '5'
+          - '10'
 
 jobs:
   bot_runner:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        runner: [1, 2, 3, 4, 5]
-      max-parallel: 3
+        runner: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      max-parallel: 5
     
     steps:
       - name: Checkout code
@@ -30,6 +32,14 @@ jobs:
         with:
           node-version: '18'
           
+      - name: Cache npm packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+            
       - name: Install dependencies
         run: |
           npm install mineflayer
@@ -40,11 +50,14 @@ jobs:
           {
             "server_ip": "node.harshteotia.in",
             "server_port": 25566,
-            "bots_per_runner": 100,
+            "username_prefix": "Bot",
+            "bots_per_runner": 20,
             "bot_spawn_delay": 500,
-            "max_bots": 100,
-            "server_version": "1.16.5",
-            "command_prefix": "!"
+            "enable_auto_reconnect": true,
+            "video_helper_mode": true,
+            "command_prefix": "!",
+            "max_bots": 20,
+            "server_version": "1.16.5"
           }
           EOF
           
@@ -54,7 +67,7 @@ jobs:
           
       - name: Create bot script
         run: |
-          cat > bot.js << 'EOF'
+          cat > bot.js << 'BOT_EOF'
           const mineflayer = require('mineflayer');
           const fs = require('fs');
 
@@ -64,9 +77,10 @@ jobs:
           const config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 
           console.log('='.repeat(60));
-          console.log('🚀 BOT SYSTEM STARTING');
+          console.log('🚀 BOT SYSTEM - GITHUB ACTIONS');
           console.log(`🎯 Server: ${config.server_ip}:${config.server_port}`);
           console.log(`🤖 Max Bots: ${config.max_bots}`);
+          console.log(`🏷️ Runner: ${process.env.RUNNER_ID || 'unknown'}`);
           console.log('='.repeat(60));
 
           // ============================================
@@ -79,8 +93,9 @@ jobs:
               BOT_NAMES.push(`Hero${i}`);
               BOT_NAMES.push(`Ace${i}`);
               BOT_NAMES.push(`Pro${i}`);
+              BOT_NAMES.push(`Star${i}`);
           }
-          const RANDOMS = ['Nitro', 'Blaze', 'Shadow', 'Frost', 'Storm', 'Venom', 'Raven', 'Lunar', 'Solar', 'Nova', 'Zephyr', 'Phantom', 'Viper', 'Cobra', 'Falcon', 'Eagle', 'Titan', 'Atlas', 'Neon', 'Cosmic', 'Galaxy'];
+          const RANDOMS = ['Nitro', 'Blaze', 'Shadow', 'Frost', 'Storm', 'Venom', 'Raven', 'Lunar', 'Solar', 'Nova', 'Zephyr', 'Phantom', 'Viper', 'Cobra', 'Falcon', 'Eagle', 'Titan', 'Atlas', 'Neon', 'Cosmic', 'Galaxy', 'Quantum', 'Zen', 'Karma', 'Apex', 'Rogue', 'Sage', 'Hawk', 'Wolf', 'Bear', 'Lion', 'Tiger', 'Dragon', 'Phoenix'];
           RANDOMS.forEach(name => {
               BOT_NAMES.push(name);
               for (let i = 0; i < 3; i++) BOT_NAMES.push(`${name}${i}`);
@@ -96,10 +111,15 @@ jobs:
                   this.runnerId = process.env.RUNNER_ID || 'runner1';
                   this.totalJoined = 0;
                   this.totalRemoved = 0;
+                  this.totalFailed = 0;
                   this.usedNames = new Set();
                   this.startTime = Date.now();
+                  this.commandsExecuted = 0;
+                  this.isRunning = true;
                   
-                  // Commands
+                  // ============================================
+                  // COMMANDS - WITH PREFIX
+                  // ============================================
                   this.commands = {
                       'ping': this.cmdPing.bind(this),
                       'help': this.cmdHelp.bind(this),
@@ -154,13 +174,14 @@ jobs:
                       'clearall': this.cmdClearAll.bind(this)
                   };
                   
-                  setInterval(() => this.displayStatus(), 60000);
+                  // Auto status display
+                  setInterval(() => this.displayStatus(), 30000);
               }
 
               getUniqueName() {
                   const available = BOT_NAMES.filter(n => !this.usedNames.has(n));
                   if (available.length === 0) {
-                      const name = `Bot_${this.usedNames.size}`;
+                      const name = `Bot_${this.usedNames.size}_${Math.floor(Math.random() * 999)}`;
                       this.usedNames.add(name);
                       return name;
                   }
@@ -169,6 +190,9 @@ jobs:
                   return name;
               }
 
+              // ============================================
+              // SPAWN BOT
+              // ============================================
               async spawnBot() {
                   const username = this.getUniqueName();
                   const botId = this.bots.length;
@@ -185,7 +209,9 @@ jobs:
                           physicsEnabled: false,
                           hideErrors: true,
                           keepAlive: true,
-                          checkTimeoutInterval: 60000
+                          checkTimeoutInterval: 60000,
+                          logErrors: false,
+                          reconnectDelay: 0
                       });
 
                       let connected = false;
@@ -194,10 +220,14 @@ jobs:
                           if (!connected) {
                               console.log(`❌ [${botId}] ${username} timeout`);
                               bot.end();
+                              this.totalFailed++;
                               resolve(false);
                           }
                       }, 15000);
 
+                      // ============================================
+                      // LOGIN - SUCCESS
+                      // ============================================
                       bot.on('login', () => {
                           connected = true;
                           clearTimeout(timeout);
@@ -221,11 +251,13 @@ jobs:
                               }
                           }, 2000);
 
-                          // Chat listener - COMMANDS WORK HERE
+                          // ============================================
+                          // CHAT LISTENER - COMMANDS WITH PREFIX
+                          // ============================================
                           bot.on('message', (message) => {
                               const text = message.toString();
                               
-                              if (text.startsWith(config.command_prefix)) {
+                              if (text.startsWith(config.command_prefix || '!')) {
                                   const command = text.slice(1).trim();
                                   console.log(`📝 ${username}: ${command}`);
                                   this.executeCommand(command, bot);
@@ -241,8 +273,10 @@ jobs:
                               }
                           });
 
+                          // Error handling
                           bot.on('error', (err) => {
                               if (err.message && err.message.includes('timeout')) return;
+                              if (err.message && err.message.includes('ECONNRESET')) return;
                               console.log(`⚠️ [${botId}] ${username}:`, err.message);
                           });
 
@@ -263,10 +297,15 @@ jobs:
                   });
               }
 
+              // ============================================
+              // EXECUTE COMMAND
+              // ============================================
               executeCommand(input, bot) {
                   const parts = input.split(' ');
                   const cmd = parts[0].toLowerCase();
                   const args = parts.slice(1);
+                  
+                  this.commandsExecuted++;
                   
                   if (this.commands[cmd]) {
                       try {
@@ -279,6 +318,9 @@ jobs:
                   }
               }
 
+              // ============================================
+              // GET TARGET BOTS
+              // ============================================
               getTargetBots(bot) {
                   if (this.selectedBots.size === 0) {
                       return this.bots.filter(b => b.connected && b.botId !== bot.botId);
@@ -289,7 +331,7 @@ jobs:
               }
 
               // ============================================
-              // COMMANDS
+              // COMMAND IMPLEMENTATIONS
               // ============================================
               
               cmdPing(bot, args) {
@@ -298,15 +340,14 @@ jobs:
 
               cmdHelp(bot, args) {
                   const help = `=== 🚀 ALL COMMANDS ===
-          📊 BASIC: !ping, !help, !status, !info, !list
-          👥 SELECT: !army, !select N, !clear, !all
-          📍 MOVE: !move X Y Z, !tp X Y Z, !circle NAME, !formation
-          🎯 FORM: !spread, !follow NAME, !line, !square, !grid, !diamond, !spiral
-          ⚔️ PVP: !attack, !pvp, !fight
-          💃 ACTION: !dance, !wave, !jump, !spin, !bow, !salute
-          💬 CHAT: !say MSG, !broadcast MSG, !whisper NAME MSG
-          ⭐ FORMATIONS: !heart, !star, !vformation, !xformation, !arrow, !cross
-          🔧 CONTROL: !remove NAME, !join N, !leave, !reset, !count, !uptime`;
+          !ping, !help, !status, !info, !list
+          !army, !select N, !clear, !all
+          !move X Y Z, !circle NAME, !formation
+          !spread, !follow NAME, !line, !square
+          !attack, !dance, !wave, !jump, !spin
+          !say MSG, !broadcast MSG, !whisper NAME MSG
+          !heart, !star, !vformation, !xformation
+          !remove NAME, !join N, !leave, !reset, !count`;
                   bot.chat(help);
               }
 
@@ -432,7 +473,7 @@ jobs:
                           b.chat(`/tp ${b.username} ${x} 65 ${z}`);
                       }
                   }
-                  bot.chat(`✅ Formation: ${Math.min(targets.length, size * size)} bots!`);
+                  bot.chat(`✅ Formation!`);
               }
 
               cmdSpread(bot, args) {
@@ -500,7 +541,7 @@ jobs:
                           b.chat(`/tp ${b.username} ${x} 65 ${bot.z || 0}`);
                       }
                   }
-                  bot.chat(`✅ Line: ${count} bots!`);
+                  bot.chat(`✅ Line!`);
               }
 
               cmdSquare(bot, args) {
@@ -524,7 +565,7 @@ jobs:
                           b.chat(`/tp ${b.username} ${(bot.x || 0) + x} 65 ${(bot.z || 0) + z}`);
                       }
                   }
-                  bot.chat(`✅ Square: ${count} bots!`);
+                  bot.chat(`✅ Square!`);
               }
 
               cmdGrid(bot, args) {
@@ -917,12 +958,15 @@ jobs:
                   const maxBots = Math.min(config.bots_per_runner, config.max_bots);
                   let spawned = 0;
 
+                  console.log(`🚀 Spawning up to ${maxBots} bots...`);
+
                   for (let i = 0; i < maxBots * 2 && spawned < maxBots; i++) {
                       const success = await this.spawnBot();
                       if (success) {
                           spawned++;
                           await this.sleep(config.bot_spawn_delay);
                       } else {
+                          console.log(`⚠️ Retry ${i + 1}`);
                           await this.sleep(1000);
                       }
                   }
@@ -939,21 +983,26 @@ jobs:
 
                   process.on('SIGINT', () => {
                       console.log('\n🛑 Shutting down...');
+                      this.isRunning = false;
                       for (const bot of this.bots) {
                           if (bot.connected) bot.end();
                       }
-                      process.exit();
+                      process.exit(0);
                   });
 
                   process.on('SIGTERM', () => {
                       console.log('\n🛑 Shutting down...');
+                      this.isRunning = false;
                       for (const bot of this.bots) {
                           if (bot.connected) bot.end();
                       }
-                      process.exit();
+                      process.exit(0);
                   });
                   
-                  return new Promise(() => {});
+                  // Keep alive
+                  while (this.isRunning) {
+                      await this.sleep(60000);
+                  }
               }
           }
 
@@ -966,11 +1015,15 @@ jobs:
               console.log('⚠️ Error:', err.message);
           });
 
+          process.on('unhandledRejection', (reason) => {
+              console.log('⚠️ Unhandled Rejection:', reason);
+          });
+
           manager.start().catch((err) => {
               console.error('❌ Fatal:', err);
               process.exit(1);
           });
-          EOF
+          BOT_EOF
           
       - name: Run bot
         env:
@@ -983,7 +1036,8 @@ jobs:
       - name: Keep alive
         if: always()
         run: |
+          echo "🔁 Keeping runner ${{ matrix.runner }} alive..."
           while true; do
-            echo "Runner ${{ matrix.runner }} is alive - $(date)"
+            echo "🔄 Runner ${{ matrix.runner }} is alive - $(date)"
             sleep 300
           done
