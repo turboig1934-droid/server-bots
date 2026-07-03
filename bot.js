@@ -4,7 +4,7 @@ const fs = require('fs');
 // Configuration
 const config = {
     server_ip: 'node.harshteotia.in',
-    server_port: 25566,
+    server_port: 25565,
     bots_per_runner: 100,
     bot_spawn_delay: 300,
     max_bots: 100,
