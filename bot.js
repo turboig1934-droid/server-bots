@@ -889,4 +889,122 @@ class BotManager {
     cmdJoin(bot, args) {
         const count = parseInt(args[0]) || 10;
         bot.chat(`🔄 Joining ${count} more bots...`);
-        for (let i = 0
+        for (let i = 0; i < count; i++) {
+            setTimeout(() => this.spawnBot(), i * 1000);
+        }
+    }
+
+    cmdLeave(bot, args) {
+        bot.chat('👋 Leaving...');
+        setTimeout(() => { bot.end(); }, 1000);
+    }
+
+    cmdReconnect(bot, args) {
+        bot.chat('🔄 Reconnecting...');
+        const username = bot.username;
+        const botId = bot.botId;
+        setTimeout(() => {
+            bot.end();
+            setTimeout(() => {
+                this.spawnBot();
+            }, 2000);
+        }, 1000);
+    }
+
+    cmdReset(bot, args) {
+        bot.chat('🔄 Resetting all bots...');
+        for (const b of this.bots) {
+            if (b.connected) b.end();
+        }
+        this.bots = [];
+        this.selectedBots.clear();
+        this.usedNames.clear();
+        setTimeout(() => {
+            this.spawnAllBots();
+        }, 3000);
+    }
+
+    cmdCount(bot, args) {
+        const active = this.bots.filter(b => b.connected).length;
+        bot.chat(`📊 Total: ${this.bots.length} | Active: ${active} | Removed: ${this.totalRemoved}`);
+    }
+
+    cmdUptime(bot, args) {
+        const uptime = Date.now() - this.startTime;
+        const seconds = Math.floor(uptime / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        bot.chat(`⏱️ ${hours}h ${minutes % 60}m ${seconds % 60}s`);
+    }
+
+    // ============================================
+    // DISPLAY STATUS
+    // ============================================
+    displayStatus() {
+        const active = this.bots.filter(b => b.connected).length;
+        console.log(`📊 STATUS: ${active}/${this.bots.length} active | Selected: ${this.selectedBots.size} | Joined: ${this.totalJoined} | Removed: ${this.totalRemoved}`);
+    }
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // ============================================
+    // SPAWN ALL BOTS
+    // ============================================
+    async spawnAllBots() {
+        const maxBots = Math.min(CONFIG.bots_per_runner, CONFIG.max_bots);
+        let spawned = 0;
+
+        for (let i = 0; i < maxBots * 2 && spawned < maxBots; i++) {
+            const success = await this.spawnBot();
+            if (success) {
+                spawned++;
+                await this.sleep(CONFIG.bot_spawn_delay);
+            } else {
+                await this.sleep(1000);
+            }
+        }
+
+        console.log(`✅ Spawned ${spawned} bots!`);
+    }
+
+    // ============================================
+    // START
+    // ============================================
+    async start() {
+        await this.spawnAllBots();
+
+        process.on('SIGINT', () => {
+            console.log('\n🛑 Shutting down...');
+            for (const bot of this.bots) {
+                if (bot.connected) bot.end();
+            }
+            process.exit();
+        });
+
+        process.on('SIGTERM', () => {
+            console.log('\n🛑 Shutting down...');
+            for (const bot of this.bots) {
+                if (bot.connected) bot.end();
+            }
+            process.exit();
+        });
+        
+        return new Promise(() => {});
+    }
+}
+
+// ============================================
+// RUN
+// ============================================
+const manager = new BotManager();
+
+process.on('uncaughtException', (err) => {
+    console.log('⚠️ Error:', err.message);
+});
+
+manager.start().catch((err) => {
+    console.error('❌ Fatal:', err);
+    process.exit(1);
+});
