@@ -16,7 +16,7 @@ npm install mineflayer
 cat > config.json << 'EOF'
 {
     "server_ip": "node.harshteotia.in",
-    "server_port": 25566,
+    "server_port": 25565,
     "username_prefix": "Bot",
     "bots_per_runner": 100,
     "bot_spawn_delay": 200,
