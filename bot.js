@@ -2,15 +2,15 @@ const mineflayer = require('mineflayer');
 const fs = require('fs');
 
 // ============================================
-// CONFIG - IP AND PORT ONLY HERE
+// CONFIG
 // ============================================
 const config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 
 console.log('='.repeat(60));
-console.log('🚀 ULTRA BOT SYSTEM - CHAT CONTROL WORKING');
+console.log('🚀 SIMPLE BOT - DIRECT JOIN');
 console.log(`🎯 Server: ${config.server_ip}:${config.server_port}`);
 console.log(`🤖 Max Bots: ${config.max_bots}`);
-console.log('📝 Just type: help, status, army, circle YourName');
+console.log('📝 Type in chat: help, status, army, circle YourName');
 console.log('='.repeat(60));
 
 // ============================================
@@ -23,13 +23,9 @@ for (let i = 0; i < 100; i++) {
     BOT_NAMES.push(`Hero${i}`);
     BOT_NAMES.push(`Ace${i}`);
     BOT_NAMES.push(`Pro${i}`);
-    BOT_NAMES.push(`Star${i}`);
 }
-const RANDOMS = ['Nitro', 'Blaze', 'Shadow', 'Frost', 'Storm', 'Venom', 'Raven', 'Lunar', 'Solar', 'Nova', 'Zephyr', 'Phantom', 'Viper', 'Cobra', 'Falcon', 'Eagle', 'Titan', 'Atlas', 'Neon', 'Cosmic', 'Galaxy', 'Quantum', 'Zen', 'Karma', 'Apex', 'Rogue', 'Sage', 'Hawk', 'Wolf', 'Bear', 'Lion', 'Tiger', 'Dragon', 'Phoenix'];
-RANDOMS.forEach(name => {
-    BOT_NAMES.push(name);
-    for (let i = 0; i < 3; i++) BOT_NAMES.push(`${name}${i}`);
-});
+const RANDOMS = ['Nitro', 'Blaze', 'Shadow', 'Frost', 'Storm', 'Venom', 'Raven', 'Lunar', 'Solar', 'Nova'];
+RANDOMS.forEach(name => BOT_NAMES.push(name));
 
 // ============================================
 // BOT MANAGER
@@ -44,27 +40,20 @@ class BotManager {
         this.usedNames = new Set();
         this.startTime = Date.now();
         this.commandsExecuted = 0;
-        this.lastCommandTime = 0;
         
         // ============================================
-        // ALL COMMANDS - NO PREFIX REQUIRED
+        // COMMANDS - NO PREFIX
         // ============================================
         this.commands = {
-            // Basic
             'help': this.cmdHelp.bind(this),
             'ping': this.cmdPing.bind(this),
             'status': this.cmdStatus.bind(this),
             'info': this.cmdInfo.bind(this),
             'list': this.cmdList.bind(this),
-            
-            // Selection
             'army': this.cmdArmy.bind(this),
             'select': this.cmdSelect.bind(this),
             'clear': this.cmdClear.bind(this),
             'all': this.cmdAll.bind(this),
-            'none': this.cmdClear.bind(this),
-            
-            // Movement
             'move': this.cmdMove.bind(this),
             'tp': this.cmdTp.bind(this),
             'circle': this.cmdCircle.bind(this),
@@ -77,35 +66,25 @@ class BotManager {
             'grid': this.cmdGrid.bind(this),
             'diamond': this.cmdDiamond.bind(this),
             'spiral': this.cmdSpiral.bind(this),
-            
-            // PvP / Attack
             'attack': this.cmdAttack.bind(this),
             'pvp': this.cmdAttack.bind(this),
             'fight': this.cmdAttack.bind(this),
-            
-            // Actions
             'dance': this.cmdDance.bind(this),
             'wave': this.cmdWave.bind(this),
             'jump': this.cmdJump.bind(this),
             'spin': this.cmdSpin.bind(this),
             'bow': this.cmdBow.bind(this),
             'salute': this.cmdSalute.bind(this),
-            
-            // Chat
             'say': this.cmdSay.bind(this),
             'broadcast': this.cmdBroadcast.bind(this),
             'whisper': this.cmdWhisper.bind(this),
             'announce': this.cmdAnnounce.bind(this),
-            
-            // Formations
             'heart': this.cmdHeart.bind(this),
             'star': this.cmdStar.bind(this),
             'vformation': this.cmdVFormation.bind(this),
             'xformation': this.cmdXFormation.bind(this),
             'arrow': this.cmdArrow.bind(this),
             'cross': this.cmdCross.bind(this),
-            
-            // Control
             'remove': this.cmdRemove.bind(this),
             'kill': this.cmdRemove.bind(this),
             'kick': this.cmdRemove.bind(this),
@@ -133,6 +112,9 @@ class BotManager {
         return name;
     }
 
+    // ============================================
+    // SPAWN BOT - DIRECT JOIN (NO REGISTRATION)
+    // ============================================
     async spawnBot() {
         const username = this.getUniqueName();
         const botId = this.bots.length;
@@ -149,7 +131,8 @@ class BotManager {
                 physicsEnabled: false,
                 hideErrors: true,
                 keepAlive: true,
-                checkTimeoutInterval: 60000
+                checkTimeoutInterval: 60000,
+                logErrors: false
             });
 
             let connected = false;
@@ -162,6 +145,9 @@ class BotManager {
                 }
             }, 15000);
 
+            // ============================================
+            // LOGIN - DIRECT JOIN
+            // ============================================
             bot.on('login', () => {
                 connected = true;
                 clearTimeout(timeout);
@@ -186,12 +172,12 @@ class BotManager {
                 }, 2000);
 
                 // ============================================
-                // CHAT LISTENER - NO PREFIX REQUIRED
+                // CHAT LISTENER - COMMANDS WORK
                 // ============================================
                 bot.on('message', (message) => {
                     const text = message.toString();
                     
-                    // Check if this is a command (no prefix needed)
+                    // Check if this is a command
                     const firstWord = text.trim().split(' ')[0].toLowerCase();
                     
                     if (this.commands[firstWord]) {
@@ -241,7 +227,6 @@ class BotManager {
         const args = parts.slice(1);
         
         this.commandsExecuted++;
-        this.lastCommandTime = Date.now();
         
         if (this.commands[cmd]) {
             try {
@@ -273,23 +258,21 @@ class BotManager {
     
     // ----- BASIC -----
     cmdHelp(bot, args) {
-        const help = `=== 🚀 ALL COMMANDS ===
-📊 BASIC: help, ping, status, info, list
-👥 SELECT: army, select N, clear, all
-📍 MOVE: move X Y Z, circle NAME, formation, spread
-📍 MORE: follow NAME, line, square, grid, diamond, spiral
-⚔️ PVP: attack, pvp, fight
-💃 ACTION: dance, wave, jump, spin, bow, salute
-💬 CHAT: say MSG, broadcast MSG, whisper NAME MSG
-⭐ FORMATIONS: heart, star, vformation, xformation, arrow, cross
-🔧 CONTROL: remove NAME, join N, leave, reset, count, uptime`;
+        const help = `=== ALL COMMANDS ===
+help, ping, status, info, list
+army, select N, clear, all
+move X Y Z, circle NAME, formation
+spread, follow NAME, line, square
+attack, dance, wave, jump, spin, bow, salute
+say MSG, broadcast MSG, whisper NAME MSG
+heart, star, vformation, xformation, arrow, cross
+remove NAME, join N, leave, reset, count, uptime`;
         bot.chat(help);
         console.log(`✅ Help sent from ${bot.username}`);
     }
 
     cmdPing(bot, args) {
-        const uptime = Date.now() - this.startTime;
-        bot.chat(`🏓 Pong! ${bot.username} is alive (${Math.round(uptime/1000)}s)`);
+        bot.chat(`🏓 Pong! ${bot.username} is alive`);
     }
 
     cmdStatus(bot, args) {
@@ -299,8 +282,7 @@ class BotManager {
     }
 
     cmdInfo(bot, args) {
-        const info = `🤖 ${bot.username} | ID: ${bot.botId} | Connected: ${bot.connected} | Pos: (${bot.x?.toFixed(1) || 0}, ${bot.y?.toFixed(1) || 65}, ${bot.z?.toFixed(1) || 0})`;
-        bot.chat(info);
+        bot.chat(`🤖 ${bot.username} | ID: ${bot.botId} | Connected: ${bot.connected}`);
     }
 
     cmdList(bot, args) {
@@ -314,7 +296,6 @@ class BotManager {
         const connected = this.bots.filter(b => b.connected && b.botId !== bot.botId);
         connected.forEach(b => this.selectedBots.add(b.botId));
         bot.chat(`✅ Army: ${connected.length} bots selected!`);
-        console.log(`✅ Army command from ${bot.username}: ${connected.length} bots`);
     }
 
     cmdSelect(bot, args) {
@@ -355,7 +336,7 @@ class BotManager {
         targets.forEach(b => {
             if (b.connected) b.chat(`/tp ${b.username} ${x} ${y} ${z}`);
         });
-        bot.chat(`✅ Moved ${targets.length} bots to (${x}, ${y}, ${z})`);
+        bot.chat(`✅ Moved ${targets.length} bots!`);
     }
 
     cmdTp(bot, args) { this.cmdMove(bot, args); }
@@ -418,7 +399,7 @@ class BotManager {
                 b.chat(`/tp ${b.username} ${x} 65 ${z}`);
             }
         }
-        bot.chat(`✅ Formation: ${Math.min(targets.length, size * size)} bots!`);
+        bot.chat(`✅ Formation!`);
     }
 
     cmdSpread(bot, args) {
@@ -486,7 +467,7 @@ class BotManager {
                 b.chat(`/tp ${b.username} ${x} 65 ${bot.z || 0}`);
             }
         }
-        bot.chat(`✅ Line: ${count} bots!`);
+        bot.chat(`✅ Line!`);
     }
 
     cmdSquare(bot, args) {
@@ -510,7 +491,7 @@ class BotManager {
                 b.chat(`/tp ${b.username} ${(bot.x || 0) + x} 65 ${(bot.z || 0) + z}`);
             }
         }
-        bot.chat(`✅ Square: ${count} bots!`);
+        bot.chat(`✅ Square!`);
     }
 
     cmdGrid(bot, args) {
@@ -567,7 +548,7 @@ class BotManager {
         bot.chat(`✅ Spiral!`);
     }
 
-    // ----- PVP / ATTACK -----
+    // ----- PVP -----
     cmdAttack(bot, args) {
         let target = null;
         if (args[0]) {
@@ -886,7 +867,7 @@ class BotManager {
     // ============================================
     displayStatus() {
         const active = this.bots.filter(b => b.connected).length;
-        console.log(`📊 STATUS: ${active}/${this.bots.length} active | Selected: ${this.selectedBots.size} | Commands: ${this.commandsExecuted}`);
+        console.log(`📊 STATUS: ${active}/${this.bots.length} active | Commands: ${this.commandsExecuted}`);
     }
 
     sleep(ms) {
@@ -911,8 +892,7 @@ class BotManager {
         }
 
         console.log(`✅ Spawned ${spawned} bots!`);
-        console.log('🎯 Type: help, status, army, circle YourName');
-        console.log('🎯 All commands work without ! prefix');
+        console.log('🎯 Type in chat: help, status, army, circle YourName');
     }
 
     // ============================================
