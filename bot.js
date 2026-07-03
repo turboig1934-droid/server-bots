@@ -43,7 +43,6 @@ const RANDOM_NAMES = [
     'Midnight', 'Dawn', 'Dusk', 'Ember', 'Flare', 'Glacier', 'Havoc', 'Inferno'
 ];
 
-// Generate names
 for (let i = 0; i < 100; i++) {
     PREFIXES.forEach(prefix => BOT_NAMES.push(`${prefix}${i}`));
 }
@@ -63,30 +62,23 @@ class UltraBotManager {
         this.totalJoined = 0;
         this.totalRemoved = 0;
         this.usedNames = new Set();
-        this.isSpawning = false;
-        this.spawnQueue = [];
-        this.commandHistory = [];
         this.startTime = Date.now();
+        this.commandHistory = [];
         
         // ============================================
-        // COMMAND HANDLERS - FULL CONTROL
+        // COMMAND HANDLERS
         // ============================================
         this.commands = {
-            // Basic Commands
             'ping': this.cmdPing.bind(this),
             'help': this.cmdHelp.bind(this),
             'status': this.cmdStatus.bind(this),
             'info': this.cmdInfo.bind(this),
             'list': this.cmdList.bind(this),
-            
-            // Selection Commands
             'army': this.cmdArmy.bind(this),
             'select': this.cmdSelect.bind(this),
             'clear': this.cmdClear.bind(this),
             'all': this.cmdAll.bind(this),
             'none': this.cmdNone.bind(this),
-            
-            // Movement Commands
             'move': this.cmdMove.bind(this),
             'tp': this.cmdTp.bind(this),
             'circle': this.cmdCircle.bind(this),
@@ -99,8 +91,6 @@ class UltraBotManager {
             'grid': this.cmdGrid.bind(this),
             'diamond': this.cmdDiamond.bind(this),
             'spiral': this.cmdSpiral.bind(this),
-            
-            // Action Commands
             'attack': this.cmdAttack.bind(this),
             'dance': this.cmdDance.bind(this),
             'wave': this.cmdWave.bind(this),
@@ -108,14 +98,10 @@ class UltraBotManager {
             'spin': this.cmdSpin.bind(this),
             'bow': this.cmdBow.bind(this),
             'salute': this.cmdSalute.bind(this),
-            
-            // Chat Commands
             'say': this.cmdSay.bind(this),
             'broadcast': this.cmdBroadcast.bind(this),
             'whisper': this.cmdWhisper.bind(this),
             'announce': this.cmdAnnounce.bind(this),
-            
-            // Control Commands
             'remove': this.cmdRemove.bind(this),
             'kill': this.cmdKill.bind(this),
             'kick': this.cmdKick.bind(this),
@@ -124,16 +110,12 @@ class UltraBotManager {
             'leave': this.cmdLeave.bind(this),
             'reconnect': this.cmdReconnect.bind(this),
             'reset': this.cmdReset.bind(this),
-            
-            // Formation Commands
             'vformation': this.cmdVFormation.bind(this),
             'xformation': this.cmdXFormation.bind(this),
             'arrow': this.cmdArrow.bind(this),
             'heart': this.cmdHeart.bind(this),
             'star': this.cmdStar.bind(this),
             'cross': this.cmdCross.bind(this),
-            
-            // Utility Commands
             'count': this.cmdCount.bind(this),
             'uptime': this.cmdUptime.bind(this),
             'memory': this.cmdMemory.bind(this),
@@ -141,13 +123,9 @@ class UltraBotManager {
             'helpall': this.cmdHelpAll.bind(this)
         };
         
-        // Auto-status display
         setInterval(() => this.displayStatus(), 60000);
     }
 
-    // ============================================
-    // NAME GENERATION
-    // ============================================
     getUniqueName() {
         const available = BOT_NAMES.filter(name => !this.usedNames.has(name));
         if (available.length === 0) {
@@ -160,9 +138,6 @@ class UltraBotManager {
         return name;
     }
 
-    // ============================================
-    // BOT SPAWNING
-    // ============================================
     async spawnBot() {
         const username = this.getUniqueName();
         const password = PASSWORDS[Math.floor(Math.random() * PASSWORDS.length)];
@@ -183,7 +158,9 @@ class UltraBotManager {
                 skipValidation: true,
                 checkTimeoutInterval: 120000,
                 keepAlive: true,
-                hideErrors: true
+                hideErrors: true,
+                // CRITICAL: Enable chat listener
+                logErrors: false
             });
 
             let connected = false;
@@ -212,14 +189,13 @@ class UltraBotManager {
                 bot.x = 0;
                 bot.y = 65;
                 bot.z = 0;
-                bot.selected = false;
                 
                 this.bots.push(bot);
                 this.totalJoined++;
                 
                 console.log(`✅ [${botId}] ${username} joined! (${this.bots.length}/${config.max_bots})`);
                 
-                // Auto register
+                // AUTO REGISTER
                 if (config.auto_register) {
                     this.autoRegister(bot, password);
                 }
@@ -229,17 +205,35 @@ class UltraBotManager {
                     if (bot.connected) {
                         bot.chat('/me joined! 🤖');
                     }
-                }, 2000);
+                }, 3000);
                 
-                // Setup chat listener
+                // ============================================
+                // CHAT LISTENER - FIXED
+                // ============================================
                 bot.on('message', (message) => {
-                    this.handleChatMessage(message, bot);
+                    const text = message.toString();
+                    console.log(`💬 ${bot.username}: ${text}`);
+                    
+                    // Check registration
+                    if (text.includes('registered') || text.includes('Registered')) {
+                        bot.registered = true;
+                        registered = true;
+                        console.log(`✅ ${bot.username} registered`);
+                    }
+                    
+                    // Check for commands - FIXED
+                    if (text.startsWith(config.command_prefix)) {
+                        const command = text.slice(config.command_prefix.length).trim();
+                        console.log(`📝 Command from ${bot.username}: ${command}`);
+                        this.executeCommand(command, bot);
+                    }
                 });
                 
-                // Handle movement errors silently
+                // Handle errors silently
                 bot.on('error', (err) => {
                     if (err.message && err.message.includes('move')) return;
                     if (err.message && err.message.includes('timeout')) return;
+                    if (err.message && err.message.includes('ECONNRESET')) return;
                     console.log(`⚠️ [${botId}] ${username} error:`, err.message);
                 });
                 
@@ -261,9 +255,6 @@ class UltraBotManager {
         });
     }
 
-    // ============================================
-    // AUTO REGISTRATION
-    // ============================================
     autoRegister(bot, password) {
         const commands = [
             `/register ${password} ${password}`,
@@ -280,51 +271,28 @@ class UltraBotManager {
                 }
                 return;
             }
+            console.log(`📝 ${bot.username} registering: ${commands[index]}`);
             bot.chat(commands[index]);
             index++;
-            setTimeout(sendNext, 400);
+            setTimeout(sendNext, 500);
         };
-        sendNext();
+        setTimeout(sendNext, 1000);
     }
 
-    // ============================================
-    // CHAT HANDLER
-    // ============================================
-    handleChatMessage(message, bot) {
-        const text = message.toString();
-        
-        // Check registration
-        if (text.includes('registered') || text.includes('Registered')) {
-            bot.registered = true;
-            console.log(`✅ ${bot.username} registered`);
-        }
-        
-        // Check commands
-        if (text.startsWith(config.command_prefix)) {
-            const command = text.slice(1).trim();
-            this.executeCommand(command, bot);
-        }
-        
-        // Track messages
-        if (text.includes('joined') || text.includes('left')) {
-            this.commandHistory.push({
-                time: Date.now(),
-                message: text,
-                bot: bot.username
-            });
-        }
-    }
-
-    // ============================================
-    // COMMAND EXECUTOR
-    // ============================================
     executeCommand(input, bot) {
         const parts = input.split(' ');
         const cmd = parts[0].toLowerCase();
         const args = parts.slice(1);
         
+        console.log(`🎯 Executing command: ${cmd} from ${bot.username}`);
+        
         if (this.commands[cmd]) {
-            this.commands[cmd](bot, args);
+            try {
+                this.commands[cmd](bot, args);
+            } catch (e) {
+                console.log(`❌ Error executing ${cmd}:`, e.message);
+                bot.chat(`❌ Error: ${e.message}`);
+            }
         } else {
             bot.chat(`❌ Unknown command: ${cmd}. Use !help`);
         }
@@ -334,9 +302,8 @@ class UltraBotManager {
     // COMMAND IMPLEMENTATIONS
     // ============================================
     
-    // ----- BASIC COMMANDS -----
     cmdPing(bot, args) {
-        bot.chat(`🏓 Pong! ${bot.username} is alive (${Date.now() - this.startTime}ms)`);
+        bot.chat(`🏓 Pong! ${bot.username} is alive`);
     }
 
     cmdHelp(bot, args) {
@@ -366,7 +333,6 @@ Name: ${bot.username}
 ID: ${bot.botId}
 Connected: ${bot.connected}
 Registered: ${bot.registered || false}
-Position: (0, 65, 0)
 Total Bots: ${this.bots.length}
 Selected: ${this.selectedBots.size}
 Runner: ${this.runnerId}`;
@@ -387,7 +353,9 @@ Runner: ${this.runnerId}`;
         const connected = this.bots.filter(b => b.connected && b.botId !== bot.botId);
         connected.forEach(b => {
             this.selectedBots.add(b.botId);
-            b.chat('📢 You are now part of the ARMY!');
+            setTimeout(() => {
+                if (b.connected) b.chat('📢 You are now part of the ARMY!');
+            }, 100);
         });
         bot.chat(`✅ ARMY formed with ${connected.length} bots!`);
     }
@@ -399,7 +367,9 @@ Runner: ${this.runnerId}`;
         for (const b of connected) {
             if (selected >= count) break;
             this.selectedBots.add(b.botId);
-            b.chat(`✅ Selected for army!`);
+            setTimeout(() => {
+                if (b.connected) b.chat(`✅ Selected for army!`);
+            }, 100);
             selected++;
         }
         bot.chat(`✅ Selected ${selected} bots!`);
@@ -436,7 +406,9 @@ Runner: ${this.runnerId}`;
         const z = parseFloat(args[2]);
         const targets = this.getTargetBots(bot);
         targets.forEach(b => {
-            b.chat(`/tp ${b.username} ${x} ${y} ${z}`);
+            if (b.connected) {
+                b.chat(`/tp ${b.username} ${x} ${y} ${z}`);
+            }
         });
         bot.chat(`✅ Moved ${targets.length} bots to (${x}, ${y}, ${z})`);
     }
@@ -454,7 +426,6 @@ Runner: ${this.runnerId}`;
         const radius = parseFloat(args[1]) || 10;
         const count = parseInt(args[2]) || 50;
         
-        // Find target
         let target = null;
         for (const b of this.bots) {
             if (b.username.toLowerCase() === targetName.toLowerCase() && b.connected) {
@@ -476,7 +447,9 @@ Runner: ${this.runnerId}`;
             const z = (target.z || 0) + radius * Math.sin(angle);
             const b = targets[i];
             if (b.connected) {
-                b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+                setTimeout(() => {
+                    b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+                }, i * 50);
             }
         }
         bot.chat(`✅ Circle around ${targetName} with ${useCount} bots!`);
@@ -500,7 +473,9 @@ Runner: ${this.runnerId}`;
             const z = startZ + (row * 3);
             const b = targets[i];
             if (b.connected) {
-                b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+                setTimeout(() => {
+                    b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+                }, i * 50);
             }
         }
         bot.chat(`✅ Formation with ${Math.min(targets.length, size * size)} bots!`);
@@ -552,10 +527,6 @@ Runner: ${this.runnerId}`;
     }
 
     cmdGoto(bot, args) {
-        if (!args[0]) {
-            bot.chat('Usage: !goto <player>');
-            return;
-        }
         this.cmdFollow(bot, args);
     }
 
@@ -681,8 +652,10 @@ Runner: ${this.runnerId}`;
                 if (b.connected) {
                     const x = (target.x || 0) + (Math.random() - 0.5) * 6;
                     const z = (target.z || 0) + (Math.random() - 0.5) * 6;
-                    b.chat(`/tp ${b.username} ${x} 65 ${z}`);
-                    b.chat(`/me attacks ${target.username}! ⚔️`);
+                    setTimeout(() => {
+                        b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+                        b.chat(`/me attacks ${target.username}! ⚔️`);
+                    }, 100);
                 }
             }
             bot.chat(`⚔️ Attacking ${target.username}!`);
@@ -849,17 +822,9 @@ Runner: ${this.runnerId}`;
         bot.chat(`❌ Bot ${targetName} not found`);
     }
 
-    cmdKill(bot, args) {
-        this.cmdRemove(bot, args);
-    }
-
-    cmdKick(bot, args) {
-        this.cmdRemove(bot, args);
-    }
-
-    cmdBan(bot, args) {
-        this.cmdRemove(bot, args);
-    }
+    cmdKill(bot, args) { this.cmdRemove(bot, args); }
+    cmdKick(bot, args) { this.cmdRemove(bot, args); }
+    cmdBan(bot, args) { this.cmdRemove(bot, args); }
 
     cmdJoin(bot, args) {
         const count = parseInt(args[0]) || 10;
@@ -1093,12 +1058,10 @@ Runner: ${this.runnerId}`;
         
         for (const seq of sequences) {
             console.log(`📹 ${seq.msg}`);
-            // Execute command on first bot
             if (this.bots.length > 0) {
                 const bot = this.bots[0];
                 if (bot.connected) {
                     if (seq.cmd === 'circle') {
-                        // Find a target
                         const target = this.bots.find(b => b.connected && b.botId !== bot.botId);
                         if (target) {
                             this.cmdCircle(bot, [target.username, '15', '40']);
@@ -1122,7 +1085,7 @@ Runner: ${this.runnerId}`;
     }
 
     // ============================================
-    // START - FIXED: Now returns a Promise
+    // START
     // ============================================
     async start() {
         await this.spawnAllBots();
@@ -1143,17 +1106,15 @@ Runner: ${this.runnerId}`;
             process.exit();
         });
         
-        // Keep the process alive
         return new Promise(() => {});
     }
 }
 
 // ============================================
-// RUN - FIXED: Proper async handling
+// RUN
 // ============================================
 const manager = new UltraBotManager();
 
-// Handle uncaught errors
 process.on('uncaughtException', (err) => {
     console.log('⚠️ Uncaught Exception:', err.message);
 });
@@ -1162,7 +1123,6 @@ process.on('unhandledRejection', (reason, promise) => {
     console.log('⚠️ Unhandled Rejection:', reason);
 });
 
-// Start the bot
 manager.start().catch((err) => {
     console.error('❌ Fatal error:', err);
     process.exit(1);
