@@ -1,6 +1,11 @@
 {
-    "name": "minecraft-bots",
-    "version": "1.0.0",
+    "name": "ultra-bot-system",
+    "version": "2.0.0",
+    "description": "Complete Minecraft bot system with all features",
+    "main": "bot.js",
+    "scripts": {
+        "start": "node bot.js"
+    },
     "dependencies": {
         "mineflayer": "^4.19.0"
     }
