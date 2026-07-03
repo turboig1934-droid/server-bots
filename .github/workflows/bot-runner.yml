@@ -27,23 +27,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.10'
+          node-version: '18'
           
-      - name: Cache pip packages
+      - name: Cache Node.js modules
         uses: actions/cache@v3
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package.json') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-node-
             
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt || echo "Using fallback"
+          npm install mineflayer
+          npm install minecraft-protocol
           
       - name: Create config
         run: |
@@ -53,11 +53,13 @@ jobs:
             "server_port": 25566,
             "username_prefix": "Bot",
             "bots_per_runner": 100,
-            "bot_spawn_delay": 0.2,
+            "bot_spawn_delay": 200,
             "enable_auto_reconnect": true,
             "video_helper_mode": true,
             "command_prefix": "!",
-            "max_bots": 100
+            "max_bots": 100,
+            "registration_password": null,
+            "server_version": "1.16.5"
           }
           EOF
           
@@ -65,15 +67,20 @@ jobs:
         run: |
           echo "RUNNER_ID=${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_${GITHUB_JOB}_${{ matrix.runner }}" >> $GITHUB_ENV
           
+      - name: Create bot script
+        run: |
+          cat > bot.js << 'EOF'
+          # Paste the bot.js content here (the full script above)
+          EOF
+          
       - name: Run bot
         env:
           RUNNER_ID: ${{ env.RUNNER_ID }}
-          PYTHONUNBUFFERED: 1
         timeout-minutes: 300
         run: |
           echo "🤖 Starting bot runner ${{ matrix.runner }}"
           echo "🏷️ Runner ID: ${{ env.RUNNER_ID }}"
-          python bot_controller.py
+          node bot.js
           
       - name: Keep runner alive
         if: always()
