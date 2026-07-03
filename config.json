@@ -3,11 +3,10 @@
     "server_port": 25566,
     "username_prefix": "Bot",
     "bots_per_runner": 100,
-    "bot_spawn_delay": 200,
+    "bot_spawn_delay": 500,
     "enable_auto_reconnect": true,
     "video_helper_mode": true,
     "command_prefix": "!",
     "max_bots": 100,
-    "registration_password": null,
     "server_version": "1.16.5"
 }
