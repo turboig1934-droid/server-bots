@@ -12,7 +12,6 @@ on:
           - '2'
           - '3'
           - '5'
-          - '10'
 
 jobs:
   bot_runner:
@@ -41,20 +40,25 @@ jobs:
           {
             "server_ip": "node.harshteotia.in",
             "server_port": 25566,
-            "username_prefix": "Bot",
             "bots_per_runner": 100,
-            "bot_spawn_delay": 200,
-            "enable_auto_reconnect": true,
-            "video_helper_mode": true,
-            "command_prefix": "!",
+            "bot_spawn_delay": 800,
             "max_bots": 100,
-            "server_version": "1.16.5"
+            "server_version": "1.16.5",
+            "command_prefix": "!",
+            "video_helper_mode": true,
+            "auto_register": true
           }
           EOF
           
       - name: Set runner ID
         run: |
           echo "RUNNER_ID=${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_${{ matrix.runner }}" >> $GITHUB_ENV
+          
+      - name: Create bot script
+        run: |
+          cat > bot.js << 'EOF'
+          # PASTE THE FULL bot.js CODE HERE
+          EOF
           
       - name: Run bot
         env:
