@@ -6,13 +6,12 @@ on:
       runners_count:
         description: 'Number of runners to spawn'
         required: true
-        default: '5'
+        default: '3'
         type: choice
         options:
           - '1'
           - '2'
           - '3'
-          - '4'
           - '5'
           - '10'
 
@@ -22,7 +21,7 @@ jobs:
     strategy:
       matrix:
         runner: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-      max-parallel: 10
+      max-parallel: 5
     
     steps:
       - name: Checkout code
@@ -43,8 +42,8 @@ jobs:
             
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || echo "Using fallback"
           
       - name: Create config
         run: |
@@ -58,9 +57,7 @@ jobs:
             "enable_auto_reconnect": true,
             "video_helper_mode": true,
             "command_prefix": "!",
-            "max_bots": 100,
-            "registration_password": null,
-            "server_version": "1.16.5"
+            "max_bots": 100
           }
           EOF
           
@@ -68,27 +65,21 @@ jobs:
         run: |
           echo "RUNNER_ID=${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_${GITHUB_JOB}_${{ matrix.runner }}" >> $GITHUB_ENV
           
-      - name: Create bot script
-        run: |
-          cat > bot_controller.py << 'EOF'
-          # Copy the bot_controller.py content here
-          # (Full script content from above)
-          EOF
-          
       - name: Run bot
         env:
           RUNNER_ID: ${{ env.RUNNER_ID }}
           PYTHONUNBUFFERED: 1
+        timeout-minutes: 300
         run: |
-          echo "Starting bot runner ${{ matrix.runner }}"
-          echo "Runner ID: ${{ env.RUNNER_ID }}"
+          echo "🤖 Starting bot runner ${{ matrix.runner }}"
+          echo "🏷️ Runner ID: ${{ env.RUNNER_ID }}"
           python bot_controller.py
           
       - name: Keep runner alive
         if: always()
         run: |
-          # Keep the runner active
+          echo "⏳ Keeping runner alive..."
           while true; do
-            sleep 60
-            echo "Runner ${{ matrix.runner }} is still alive"
+            echo "🔄 Runner ${{ matrix.runner }} is alive - $(date)"
+            sleep 300
           done
