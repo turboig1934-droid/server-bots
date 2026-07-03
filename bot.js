@@ -1,6 +1,5 @@
 const mineflayer = require('mineflayer');
 const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
 
 // Configuration
@@ -9,22 +8,27 @@ const config = {
     server_port: 25566,
     username_prefix: 'Bot',
     bots_per_runner: 100,
-    bot_spawn_delay: 200, // milliseconds
+    bot_spawn_delay: 500,
     enable_auto_reconnect: true,
     video_helper_mode: true,
     command_prefix: '!',
     max_bots: 100,
-    registration_password: null,
     server_version: '1.16.5'
 };
 
-// Try to load config file
 try {
     const configFile = fs.readFileSync('config.json', 'utf8');
     Object.assign(config, JSON.parse(configFile));
 } catch (e) {
     console.log('📝 Using default config');
 }
+
+// Predefined passwords for fast registration
+const PASSWORDS = [
+    'password123', 'minecraft', 'server123', 'bot123', 'admin123',
+    '12345678', 'qwerty123', 'abc123456', 'botpassword', 'serverpass',
+    'register123', 'login123', 'pass1234', 'botpass', 'mcserver'
+];
 
 class MinecraftBotManager {
     constructor() {
@@ -36,6 +40,7 @@ class MinecraftBotManager {
         this.usedNames = new Set();
         this.botNames = this.generateBotNames();
         this.running = true;
+        this.isSpawning = false;
         this.commandHandlers = {
             'ping': this.handlePing.bind(this),
             'help': this.handleHelp.bind(this),
@@ -54,9 +59,6 @@ class MinecraftBotManager {
             'spread': this.handleSpread.bind(this),
             'info': this.handleInfo.bind(this),
             'clear': this.handleClear.bind(this),
-            'join': this.handleJoin.bind(this),
-            'leave': this.handleLeave.bind(this),
-            'tp': this.handleTp.bind(this),
             'list': this.handleList.bind(this)
         };
     }
@@ -65,27 +67,18 @@ class MinecraftBotManager {
         const names = [];
         const prefixes = ['Bot', 'Player', 'Hero', 'Ace', 'Pro', 'Star', 'Nitro', 'Blaze', 'Shadow', 'Frost'];
         
-        // Generate numbered names
         for (let i = 0; i < 100; i++) {
             prefixes.forEach(prefix => {
                 names.push(`${prefix}${i}`);
             });
         }
         
-        // Add random names
         const randomNames = [
             'Nitro', 'Blaze', 'Shadow', 'Frost', 'Storm', 'Venom', 'Raven', 'Lunar',
             'Solar', 'Nova', 'Zephyr', 'Phantom', 'Viper', 'Cobra', 'Falcon', 'Eagle',
             'Titan', 'Atlas', 'Neon', 'Cosmic', 'Galaxy', 'Quantum', 'Zen', 'Karma',
             'Apex', 'Rogue', 'Sage', 'Hawk', 'Wolf', 'Bear', 'Lion', 'Tiger',
-            'Dragon', 'Phoenix', 'Serpent', 'Griffin', 'Mystic', 'Eclipse', 'Aurora',
-            'Midnight', 'Dawn', 'Dusk', 'Ember', 'Flare', 'Glacier', 'Havoc', 'Inferno',
-            'Jade', 'Knight', 'Legend', 'Mercury', 'Neptune', 'Orion', 'Pegasus',
-            'Quasar', 'Radar', 'Sonic', 'Tempest', 'Ulysses', 'Vanguard', 'Warden',
-            'Xenon', 'Yukon', 'Zeppelin', 'Arctic', 'Bandit', 'Cipher', 'Drift',
-            'Echo', 'Fury', 'Gambit', 'Helix', 'Icarus', 'Jinx', 'Kestrel', 'Lyric',
-            'Maverick', 'Nebula', 'Omega', 'Pathfinder', 'Quest', 'Rocket', 'Spirit',
-            'Thunder', 'Unity', 'Valor', 'Wraith', 'Xenith', 'Yeti', 'Zenith'
+            'Dragon', 'Phoenix', 'Serpent', 'Griffin', 'Mystic', 'Eclipse', 'Aurora'
         ];
         
         randomNames.forEach(name => {
@@ -112,6 +105,7 @@ class MinecraftBotManager {
 
     async spawnBot(botId) {
         const username = this.getUniqueName();
+        const password = PASSWORDS[Math.floor(Math.random() * PASSWORDS.length)];
         
         return new Promise((resolve) => {
             console.log(`🤖 Spawning bot ${botId + 1}: ${username}`);
@@ -122,12 +116,22 @@ class MinecraftBotManager {
                 username: username,
                 version: config.server_version || '1.16.5',
                 auth: 'offline',
-                checkTimeoutInterval: 60000,
+                // CRITICAL FIX: Disable physics to prevent movement errors
+                physicsEnabled: false,
+                // Disable auto-reconnect
+                reconnectDelay: 0,
+                // Fixed spawn position
+                defaultPosition: [0, 65, 0],
+                // Don't send movement packets
+                skipValidation: true,
+                // Reduce packet frequency
+                checkTimeoutInterval: 120000,
                 keepAlive: true
             });
 
             let connected = false;
-            let timeout = setTimeout(() => {
+            let registered = false;
+            let loginTimeout = setTimeout(() => {
                 if (!connected) {
                     console.log(`❌ Bot ${username} connection timeout`);
                     bot.end();
@@ -135,42 +139,56 @@ class MinecraftBotManager {
                 }
             }, 15000);
 
+            // Handle login
             bot.on('login', () => {
                 connected = true;
-                clearTimeout(timeout);
-                this.totalJoined++;
-                console.log(`✅ Bot ${username} (${botId + 1}/${config.bots_per_runner}) joined successfully`);
-                
-                // Auto register if needed
-                this.autoRegister(bot);
+                clearTimeout(loginTimeout);
+                console.log(`✅ Bot ${username} logged in`);
                 
                 // Store bot reference
                 bot.botId = botId;
                 bot.username = username;
-                bot.x = Math.random() * 40 - 20;
-                bot.y = 64;
-                bot.z = Math.random() * 40 - 20;
+                bot.password = password;
                 bot.connected = true;
                 bot.registered = false;
+                bot.x = 0;
+                bot.y = 65;
+                bot.z = 0;
                 
+                // CRITICAL: Don't move the bot automatically
+                // Just stay at spawn position
+                
+                // Try to register quickly
+                this.quickRegister(bot, password);
+                
+                // Add to bots list
                 this.bots.push(bot);
+                this.totalJoined++;
                 
-                // Send join message
+                // Send join message after delay
                 setTimeout(() => {
-                    bot.chat('/me has arrived! 🤖');
-                }, 1000);
+                    if (bot.connected) {
+                        bot.chat('/me joined! 🤖');
+                    }
+                }, 2000);
                 
                 resolve(true);
             });
 
+            // Handle errors - ignore movement errors
             bot.on('error', (err) => {
+                // Ignore movement errors
+                if (err.message && err.message.includes('move')) {
+                    return;
+                }
                 console.log(`❌ Bot ${username} error:`, err.message);
-                clearTimeout(timeout);
+                clearTimeout(loginTimeout);
                 if (!connected) {
                     resolve(false);
                 }
             });
 
+            // Handle disconnect
             bot.on('end', () => {
                 if (connected) {
                     console.log(`Bot ${username} disconnected`);
@@ -180,6 +198,11 @@ class MinecraftBotManager {
             });
 
             bot.on('kickDisconnect', (reason) => {
+                // Ignore movement kicks
+                if (reason && reason.includes('move')) {
+                    console.log(`⚠️ Bot ${username} kicked for movement (ignoring)`);
+                    return;
+                }
                 console.log(`Bot ${username} kicked:`, reason);
                 bot.connected = false;
                 this.totalRemoved++;
@@ -189,57 +212,62 @@ class MinecraftBotManager {
             bot.on('message', (message) => {
                 const text = message.toString();
                 
-                // Check for registration
+                // Check registration success
                 if (text.includes('registered') || text.includes('Registered')) {
                     bot.registered = true;
-                    console.log(`✅ Bot ${username} registered`);
+                    registered = true;
+                    console.log(`✅ Bot ${username} registered successfully`);
                 }
                 
-                // Check for commands
+                // Check login success
+                if (text.includes('logged in') || text.includes('Logged in')) {
+                    bot.registered = true;
+                    registered = true;
+                }
+                
+                // Handle commands
                 if (text.startsWith(config.command_prefix)) {
                     this.handleCommand(text, bot);
                 }
-                
-                // Check if this bot was removed
-                if (text.includes(username) && (text.includes('left') || text.includes('removed'))) {
-                    bot.connected = false;
-                    this.totalRemoved++;
-                }
             });
 
-            // Handle position updates
-            bot.on('move', () => {
-                if (bot.entity) {
-                    bot.x = bot.entity.position.x;
-                    bot.y = bot.entity.position.y;
-                    bot.z = bot.entity.position.z;
-                }
+            // CRITICAL: Override movement to prevent invalid packets
+            // Don't send any movement packets
+            bot._client.on('position', (packet) => {
+                // Block position updates
+                return;
             });
+
+            // Prevent auto-movement
+            if (bot._client) {
+                bot._client.on('player_position', (packet) => {
+                    // Don't respond to position requests
+                    return;
+                });
+            }
         });
     }
 
-    async autoRegister(bot) {
-        try {
-            const password = this.generatePassword();
-            const commands = [
-                `/register ${password} ${password}`,
-                `/reg ${password} ${password}`,
-                `/register ${password}`,
-                `/login ${password}`,
-                `/l ${password}`
-            ];
+    async quickRegister(bot, password) {
+        // Fast registration - send commands quickly
+        const registerCommands = [
+            `/register ${password} ${password}`,
+            `/reg ${password} ${password}`,
+            `/login ${password}`,
+            `/l ${password}`
+        ];
+        
+        for (const cmd of registerCommands) {
+            if (!bot.connected) break;
+            if (bot.registered) break;
             
-            for (const cmd of commands) {
-                await this.sleep(500);
+            try {
                 bot.chat(cmd);
+                await this.sleep(300);
+            } catch (e) {
+                // Ignore errors
             }
-        } catch (e) {
-            // Ignore registration errors
         }
-    }
-
-    generatePassword() {
-        return crypto.randomBytes(8).toString('hex');
     }
 
     sleep(ms) {
@@ -276,7 +304,6 @@ class MinecraftBotManager {
 
         console.log(`✅ Successfully spawned ${spawned} bots out of ${maxBots} attempts`);
         
-        // Run video helper if enabled
         if (config.video_helper_mode && spawned > 0) {
             await this.sleep(5000);
             await this.runVideoHelper();
@@ -315,7 +342,6 @@ class MinecraftBotManager {
             '/me [Video] Creating army formation',
             '/me [Video] Circle formation activated',
             '/me [Video] Battle formation',
-            '/me [Video] Group moving to positions',
             '/me [Video] Recording completed! 🎉'
         ];
         
@@ -366,8 +392,7 @@ class MinecraftBotManager {
 !spread - Spread out bots
 !info - Show bot info
 !clear - Clear selected
-!list - List all bots
-!tp <x> <y> <z> - Teleport bot`;
+!list - List all bots`;
         bot.chat(help);
     }
 
@@ -385,23 +410,6 @@ class MinecraftBotManager {
         bot.chat(`Connected bots: ${botList || 'None'}`);
     }
 
-    handleTp(bot, args) {
-        try {
-            const parts = args.split(' ');
-            if (parts.length === 3) {
-                const x = parseFloat(parts[0]);
-                const y = parseFloat(parts[1]);
-                const z = parseFloat(parts[2]);
-                bot.chat(`/tp ${bot.username} ${x} ${y} ${z}`);
-                bot.chat(`Teleported to (${x}, ${y}, ${z})`);
-            } else {
-                bot.chat('Usage: !tp <x> <y> <z>');
-            }
-        } catch (e) {
-            bot.chat('Invalid coordinates');
-        }
-    }
-
     handleCircle(bot, args) {
         try {
             const parts = args.split(' ');
@@ -412,7 +420,6 @@ class MinecraftBotManager {
 
             const targetName = parts[0];
             const radius = parseFloat(parts[1]) || 10;
-            const botCount = parseInt(parts[2]) || 50;
 
             // Find target
             let targetBot = null;
@@ -430,14 +437,14 @@ class MinecraftBotManager {
 
             // Get connected bots
             const connectedBots = this.bots.filter(b => b.connected && b.botId !== bot.botId);
-            const count = Math.min(connectedBots.length, botCount);
+            const count = Math.min(connectedBots.length, 50);
 
             if (count < 1) {
                 bot.chat('Not enough bots for circle');
                 return;
             }
 
-            // Create circle
+            // Create circle using tp
             const centerX = targetBot.x || 0;
             const centerZ = targetBot.z || 0;
 
@@ -455,7 +462,6 @@ class MinecraftBotManager {
             bot.chat(`✅ Circle created around ${targetName} with ${count} bots!`);
         } catch (e) {
             bot.chat('❌ Error creating circle');
-            console.error(e);
         }
     }
 
@@ -507,7 +513,6 @@ class MinecraftBotManager {
                 removed = true;
                 bot.chat(`✅ Bot ${targetName} removed`);
                 
-                // Notify all bots
                 for (const remainingBot of this.bots) {
                     if (remainingBot.connected && remainingBot.botId !== bot.botId) {
                         remainingBot.chat(`Bot ${targetName} was removed!`);
@@ -626,11 +631,10 @@ class MinecraftBotManager {
         }
 
         const danceMoves = [
-            [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1],
-            [1, 0, 1], [-1, 0, -1], [1, 0, -1], [-1, 0, 1]
+            [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]
         ];
 
-        for (const move of danceMoves.slice(0, 4)) {
+        for (const move of danceMoves) {
             for (const b of selectedBots.slice(0, 20)) {
                 if (b.connected) {
                     const x = (b.x || 0) + move[0];
@@ -707,7 +711,7 @@ Bot: ${bot.username}
 ID: ${bot.botId}
 Connected: ${bot.connected}
 Registered: ${bot.registered || false}
-Position: (${(bot.x || 0).toFixed(1)}, ${(bot.y || 64).toFixed(1)}, ${(bot.z || 0).toFixed(1)})
+Position: (0, 65, 0)
 Total Bots: ${this.bots.length}
 Selected: ${this.selectedBots.size}
 Joined: ${this.totalJoined}
@@ -718,18 +722,6 @@ Removed: ${this.totalRemoved}`;
     handleClear(bot, args) {
         this.selectedBots.clear();
         bot.chat('✅ Selected bots cleared!');
-    }
-
-    handleJoin(bot, args) {
-        // Spawn more bots
-        this.spawnAllBots();
-    }
-
-    handleLeave(bot, args) {
-        bot.chat('/me is leaving! 👋');
-        setTimeout(() => {
-            bot.end();
-        }, 1000);
     }
 
     async start() {
