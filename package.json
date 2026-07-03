@@ -1,10 +1,14 @@
 {
-    "name": "minecraft-bot-system",
-    "version": "1.0.0",
-    "description": "Pure socket Minecraft bots - no movement errors",
+    "name": "ultra-minecraft-bots",
+    "version": "2.0.0",
+    "description": "Ultimate Minecraft bot system with full chat control",
     "main": "bot.js",
     "scripts": {
-        "start": "node bot.js"
+        "start": "node bot.js",
+        "dev": "nodemon bot.js"
     },
-    "dependencies": {}
+    "dependencies": {
+        "mineflayer": "^4.19.0",
+        "fs": "^0.0.1-security"
+    }
 }
