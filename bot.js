@@ -1,24 +1,40 @@
+// ============================================
+// COMPLETE BOT SYSTEM - ALL FEATURES
+// IP READ FROM config.json
+// ============================================
+
 const mineflayer = require('mineflayer');
 const fs = require('fs');
 
-// Configuration
-const config = {
-    server_ip: 'node.harshteotia.in',
-    server_port: 25565,
-    bots_per_runner: 100,
-    bot_spawn_delay: 300,
-    max_bots: 100,
-    server_version: '1.16.5',
-    command_prefix: '!'
-};
+// ============================================
+// LOAD CONFIG - IP ONLY HERE
+// ============================================
+const CONFIG = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 
-try {
-    const configFile = fs.readFileSync('config.json', 'utf8');
-    Object.assign(config, JSON.parse(configFile));
-} catch (e) {
-    console.log('📝 Using default config');
+console.log('='.repeat(60));
+console.log('🚀 ULTRA BOT SYSTEM');
+console.log(`🎯 Server: ${CONFIG.server_ip}:${CONFIG.server_port}`);
+console.log(`🤖 Max Bots: ${CONFIG.max_bots}`);
+console.log('='.repeat(60));
+
+// ============================================
+// BOT NAMES
+// ============================================
+const BOT_NAMES = [];
+const PREFIXES = ['Bot', 'Player', 'Hero', 'Ace', 'Pro', 'Nitro', 'Blaze', 'Shadow', 'Frost', 'Storm', 'Elite'];
+const RANDOMS = ['Nitro', 'Blaze', 'Shadow', 'Frost', 'Storm', 'Venom', 'Raven', 'Lunar', 'Solar', 'Nova', 'Zephyr', 'Phantom', 'Viper', 'Cobra', 'Falcon', 'Eagle', 'Titan', 'Atlas', 'Neon', 'Cosmic', 'Galaxy', 'Quantum', 'Zen', 'Karma', 'Apex', 'Rogue', 'Sage', 'Hawk', 'Wolf', 'Bear', 'Lion', 'Tiger', 'Dragon', 'Phoenix'];
+
+for (let i = 0; i < 100; i++) {
+    PREFIXES.forEach(p => BOT_NAMES.push(`${p}${i}`));
 }
+RANDOMS.forEach(name => {
+    BOT_NAMES.push(name);
+    for (let i = 0; i < 3; i++) BOT_NAMES.push(`${name}${i}`);
+});
 
+// ============================================
+// MAIN BOT MANAGER
+// ============================================
 class BotManager {
     constructor() {
         this.bots = [];
@@ -27,67 +43,88 @@ class BotManager {
         this.totalJoined = 0;
         this.totalRemoved = 0;
         this.usedNames = new Set();
-        this.botNames = this.generateNames();
         this.startTime = Date.now();
+        this.isSpawning = false;
         
-        // All commands
+        // ============================================
+        // ALL COMMANDS
+        // ============================================
         this.commands = {
+            // Basic
             'ping': this.cmdPing.bind(this),
             'help': this.cmdHelp.bind(this),
             'status': this.cmdStatus.bind(this),
             'info': this.cmdInfo.bind(this),
             'list': this.cmdList.bind(this),
+            
+            // Selection
             'army': this.cmdArmy.bind(this),
             'select': this.cmdSelect.bind(this),
             'clear': this.cmdClear.bind(this),
             'all': this.cmdAll.bind(this),
+            
+            // Movement
             'move': this.cmdMove.bind(this),
             'tp': this.cmdTp.bind(this),
             'circle': this.cmdCircle.bind(this),
             'formation': this.cmdFormation.bind(this),
             'spread': this.cmdSpread.bind(this),
             'follow': this.cmdFollow.bind(this),
+            'goto': this.cmdGoto.bind(this),
+            'line': this.cmdLine.bind(this),
+            'square': this.cmdSquare.bind(this),
+            'grid': this.cmdGrid.bind(this),
+            'diamond': this.cmdDiamond.bind(this),
+            'spiral': this.cmdSpiral.bind(this),
+            
+            // PvP / Attack
             'attack': this.cmdAttack.bind(this),
+            'pvp': this.cmdPvp.bind(this),
+            'fight': this.cmdFight.bind(this),
+            'kill': this.cmdKill.bind(this),
+            'remove': this.cmdRemove.bind(this),
+            
+            // Actions
             'dance': this.cmdDance.bind(this),
             'wave': this.cmdWave.bind(this),
+            'jump': this.cmdJump.bind(this),
+            'spin': this.cmdSpin.bind(this),
+            'bow': this.cmdBow.bind(this),
+            'salute': this.cmdSalute.bind(this),
+            
+            // Chat
             'say': this.cmdSay.bind(this),
             'broadcast': this.cmdBroadcast.bind(this),
-            'remove': this.cmdRemove.bind(this),
-            'kill': this.cmdKill.bind(this),
-            'join': this.cmdJoin.bind(this),
-            'leave': this.cmdLeave.bind(this),
-            'count': this.cmdCount.bind(this),
+            'whisper': this.cmdWhisper.bind(this),
+            'announce': this.cmdAnnounce.bind(this),
+            
+            // Formations
             'heart': this.cmdHeart.bind(this),
             'star': this.cmdStar.bind(this),
-            'vformation': this.cmdVFormation.bind(this)
+            'vformation': this.cmdVFormation.bind(this),
+            'xformation': this.cmdXFormation.bind(this),
+            'arrow': this.cmdArrow.bind(this),
+            'cross': this.cmdCross.bind(this),
+            
+            // Control
+            'join': this.cmdJoin.bind(this),
+            'leave': this.cmdLeave.bind(this),
+            'reconnect': this.cmdReconnect.bind(this),
+            'reset': this.cmdReset.bind(this),
+            'count': this.cmdCount.bind(this),
+            'uptime': this.cmdUptime.bind(this)
         };
         
         setInterval(() => this.displayStatus(), 60000);
     }
 
-    generateNames() {
-        const names = [];
-        const prefixes = ['Bot', 'Player', 'Hero', 'Ace', 'Pro', 'Nitro', 'Blaze', 'Shadow', 'Frost'];
-        const randoms = ['Nitro', 'Blaze', 'Shadow', 'Frost', 'Storm', 'Venom', 'Raven', 'Lunar',
-            'Solar', 'Nova', 'Zephyr', 'Phantom', 'Viper', 'Cobra', 'Falcon', 'Eagle',
-            'Titan', 'Atlas', 'Neon', 'Cosmic', 'Galaxy', 'Quantum', 'Zen', 'Karma',
-            'Apex', 'Rogue', 'Sage', 'Hawk', 'Wolf', 'Bear', 'Lion', 'Tiger'];
-        
-        for (let i = 0; i < 100; i++) {
-            prefixes.forEach(p => names.push(`${p}${i}`));
-        }
-        randoms.forEach(name => {
-            names.push(name);
-            for (let i = 0; i < 3; i++) names.push(`${name}${i}`);
-        });
-        
-        return names;
-    }
-
+    // ============================================
+    // NAME GENERATION
+    // ============================================
     getUniqueName() {
-        const available = this.botNames.filter(n => !this.usedNames.has(n));
+        const available = BOT_NAMES.filter(n => !this.usedNames.has(n));
         if (available.length === 0) {
-            const name = `Bot_${this.usedNames.size}`;
+            const name = `Bot_${this.usedNames.size}_${Math.floor(Math.random() * 999)}`;
             this.usedNames.add(name);
             return name;
         }
@@ -96,6 +133,9 @@ class BotManager {
         return name;
     }
 
+    // ============================================
+    // SPAWN BOT
+    // ============================================
     async spawnBot() {
         const username = this.getUniqueName();
         const botId = this.bots.length;
@@ -104,16 +144,15 @@ class BotManager {
             console.log(`🤖 [${botId}] Spawning: ${username}`);
 
             const bot = mineflayer.createBot({
-                host: config.server_ip,
-                port: config.server_port,
+                host: CONFIG.server_ip,
+                port: CONFIG.server_port,
                 username: username,
-                version: config.server_version,
+                version: CONFIG.server_version || '1.16.5',
                 auth: 'offline',
-                physicsEnabled: false,
+                physicsEnabled: true,  // ENABLED for movement
                 hideErrors: true,
                 keepAlive: true,
-                checkTimeoutInterval: 60000,
-                defaultPosition: [0, 65, 0]
+                checkTimeoutInterval: 60000
             });
 
             let connected = false;
@@ -127,7 +166,7 @@ class BotManager {
             }, 15000);
 
             // ============================================
-            // LOGIN - SUCCESS
+            // LOGIN
             // ============================================
             bot.on('login', () => {
                 connected = true;
@@ -143,7 +182,7 @@ class BotManager {
                 this.bots.push(bot);
                 this.totalJoined++;
                 
-                console.log(`✅ [${botId}] ${username} joined! (${this.bots.length}/${config.max_bots})`);
+                console.log(`✅ [${botId}] ${username} joined! (${this.bots.length}/${CONFIG.max_bots})`);
 
                 // Send join message
                 setTimeout(() => {
@@ -153,22 +192,29 @@ class BotManager {
                 }, 2000);
 
                 // ============================================
-                // CHAT LISTENER - COMMANDS WORK HERE
+                // CHAT LISTENER - COMMANDS
                 // ============================================
                 bot.on('message', (message) => {
                     const text = message.toString();
                     
-                    // Check for commands
-                    if (text.startsWith(config.command_prefix)) {
-                        const command = text.slice(config.command_prefix.length).trim();
-                        console.log(`📝 Command from ${username}: ${command}`);
+                    if (text.startsWith(CONFIG.command_prefix)) {
+                        const command = text.slice(CONFIG.command_prefix.length).trim();
+                        console.log(`📝 ${username}: ${command}`);
                         this.executeCommand(command, bot);
+                    }
+                });
+
+                // Track position
+                bot.on('move', () => {
+                    if (bot.entity) {
+                        bot.x = bot.entity.position.x;
+                        bot.y = bot.entity.position.y;
+                        bot.z = bot.entity.position.z;
                     }
                 });
 
                 // Handle errors
                 bot.on('error', (err) => {
-                    if (err.message && err.message.includes('move')) return;
                     if (err.message && err.message.includes('timeout')) return;
                     console.log(`⚠️ [${botId}] ${username} error:`, err.message);
                 });
@@ -205,12 +251,24 @@ class BotManager {
                 bot.chat(`❌ Error: ${e.message}`);
             }
         } else {
-            bot.chat(`❌ Unknown command: ${cmd}. Use !help`);
+            bot.chat(`❌ Unknown: ${cmd}. Use !help`);
         }
     }
 
     // ============================================
-    // COMMAND IMPLEMENTATIONS
+    // GET TARGET BOTS
+    // ============================================
+    getTargetBots(bot) {
+        if (this.selectedBots.size === 0) {
+            return this.bots.filter(b => b.connected && b.botId !== bot.botId);
+        }
+        return this.bots.filter(b => 
+            this.selectedBots.has(b.botId) && b.connected && b.botId !== bot.botId
+        );
+    }
+
+    // ============================================
+    // COMMANDS - BASIC
     // ============================================
     
     cmdPing(bot, args) {
@@ -218,35 +276,16 @@ class BotManager {
     }
 
     cmdHelp(bot, args) {
-        const help = `=== 🚀 BOT COMMANDS ===
-!ping - Check bot status
-!help - Show this help
-!status - Show bot statistics
-!info - Show bot info
-!list - List all bots
-!army - Select ALL bots
-!select N - Select N bots
-!clear - Clear selection
-!all - Select all bots
-!move X Y Z - Move bots
-!tp X Y Z - Teleport bots
-!circle NAME - Circle around player
-!formation - Battle formation
-!spread - Spread bots
-!follow NAME - Follow player
-!attack - Attack!
-!dance - Dance!
-!wave - Wave!
-!say MSG - Send message
-!broadcast MSG - Broadcast
-!remove NAME - Remove bot
-!kill NAME - Kill bot
-!join N - Spawn more bots
-!leave - Bot leaves
-!count - Count bots
-!heart - Heart formation
-!star - Star formation
-!vformation - V formation`;
+        const help = `=== 🚀 ALL COMMANDS ===
+📊 BASIC: !ping, !help, !status, !info, !list
+👥 SELECT: !army, !select N, !clear, !all
+📍 MOVE: !move X Y Z, !tp X Y Z, !circle NAME, !formation
+🎯 FORM: !spread, !follow NAME, !line, !square, !grid, !diamond, !spiral
+⚔️ PVP: !attack, !pvp, !fight, !kill NAME, !remove NAME
+💃 ACTION: !dance, !wave, !jump, !spin, !bow, !salute
+💬 CHAT: !say MSG, !broadcast MSG, !whisper NAME MSG
+⭐ FORMATIONS: !heart, !star, !vformation, !xformation, !arrow, !cross
+🔧 CONTROL: !join N, !leave, !reconnect, !reset, !count, !uptime`;
         bot.chat(help);
     }
 
@@ -257,25 +296,18 @@ class BotManager {
     }
 
     cmdInfo(bot, args) {
-        const info = `=== 🤖 BOT INFO ===
-Name: ${bot.username}
-ID: ${bot.botId}
-Connected: ${bot.connected}
-Total Bots: ${this.bots.length}
-Selected: ${this.selectedBots.size}
-Runner: ${this.runnerId}`;
-        bot.chat(info);
+        bot.chat(`🤖 ${bot.username} | ID: ${bot.botId} | Connected: ${bot.connected} | Pos: (${bot.x?.toFixed(1) || 0}, ${bot.y?.toFixed(1) || 65}, ${bot.z?.toFixed(1) || 0})`);
     }
 
     cmdList(bot, args) {
-        const list = this.bots
-            .filter(b => b.connected)
-            .map(b => b.username)
-            .join(', ');
+        const list = this.bots.filter(b => b.connected).map(b => b.username).join(', ');
         bot.chat(`📋 Bots: ${list || 'None'}`);
     }
 
-    // ----- SELECTION -----
+    // ============================================
+    // COMMANDS - SELECTION
+    // ============================================
+    
     cmdArmy(bot, args) {
         this.selectedBots.clear();
         const connected = this.bots.filter(b => b.connected && b.botId !== bot.botId);
@@ -283,7 +315,7 @@ Runner: ${this.runnerId}`;
             this.selectedBots.add(b.botId);
             setTimeout(() => { if (b.connected) b.chat('📢 Army!'); }, 100);
         });
-        bot.chat(`✅ Army with ${connected.length} bots!`);
+        bot.chat(`✅ Army: ${connected.length} bots!`);
     }
 
     cmdSelect(bot, args) {
@@ -308,10 +340,13 @@ Runner: ${this.runnerId}`;
         this.bots.forEach(b => {
             if (b.connected) this.selectedBots.add(b.botId);
         });
-        bot.chat(`✅ All ${this.selectedBots.size} bots selected!`);
+        bot.chat(`✅ All ${this.selectedBots.size} bots!`);
     }
 
-    // ----- MOVEMENT -----
+    // ============================================
+    // COMMANDS - MOVEMENT
+    // ============================================
+    
     cmdMove(bot, args) {
         if (args.length < 3) {
             bot.chat('Usage: !move <x> <y> <z>');
@@ -322,7 +357,9 @@ Runner: ${this.runnerId}`;
         const z = parseFloat(args[2]);
         const targets = this.getTargetBots(bot);
         targets.forEach(b => {
-            if (b.connected) b.chat(`/tp ${b.username} ${x} ${y} ${z}`);
+            if (b.connected) {
+                b.chat(`/tp ${b.username} ${x} ${y} ${z}`);
+            }
         });
         bot.chat(`✅ Moved ${targets.length} bots!`);
     }
@@ -347,7 +384,7 @@ Runner: ${this.runnerId}`;
             }
         }
         if (!target) {
-            bot.chat(`❌ Player ${targetName} not found`);
+            bot.chat(`❌ ${targetName} not found`);
             return;
         }
         
@@ -365,13 +402,13 @@ Runner: ${this.runnerId}`;
                 }, i * 50);
             }
         }
-        bot.chat(`✅ Circle with ${count} bots!`);
+        bot.chat(`✅ Circle: ${count} bots around ${targetName}!`);
     }
 
     cmdFormation(bot, args) {
         const targets = this.getTargetBots(bot);
         if (targets.length === 0) {
-            bot.chat('❌ No bots selected! Use !army');
+            bot.chat('❌ No bots! Use !army');
             return;
         }
         
@@ -389,7 +426,7 @@ Runner: ${this.runnerId}`;
                 b.chat(`/tp ${b.username} ${x} 65 ${z}`);
             }
         }
-        bot.chat(`✅ Formation!`);
+        bot.chat(`✅ Formation: ${Math.min(targets.length, size * size)} bots!`);
     }
 
     cmdSpread(bot, args) {
@@ -420,7 +457,7 @@ Runner: ${this.runnerId}`;
             }
         }
         if (!target) {
-            bot.chat(`❌ Player ${targetName} not found`);
+            bot.chat(`❌ ${targetName} not found`);
             return;
         }
         
@@ -437,7 +474,113 @@ Runner: ${this.runnerId}`;
         bot.chat(`✅ Following ${targetName}!`);
     }
 
-    // ----- ACTIONS -----
+    cmdGoto(bot, args) {
+        this.cmdFollow(bot, args);
+    }
+
+    cmdLine(bot, args) {
+        const targets = this.getTargetBots(bot);
+        const count = targets.length;
+        if (count === 0) {
+            bot.chat('❌ No bots!');
+            return;
+        }
+        
+        const spacing = parseFloat(args[0]) || 2;
+        const startX = (bot.x || 0) - (count * spacing / 2);
+        
+        for (let i = 0; i < count; i++) {
+            const b = targets[i];
+            if (b.connected) {
+                const x = startX + i * spacing;
+                b.chat(`/tp ${b.username} ${x} 65 ${bot.z || 0}`);
+            }
+        }
+        bot.chat(`✅ Line: ${count} bots!`);
+    }
+
+    cmdSquare(bot, args) {
+        const targets = this.getTargetBots(bot);
+        const count = Math.min(targets.length, 40);
+        const size = parseFloat(args[0]) || 20;
+        const perSide = Math.ceil(count / 4);
+        
+        for (let i = 0; i < count; i++) {
+            const side = Math.floor(i / perSide);
+            const pos = i % perSide;
+            let x = 0, z = 0;
+            switch(side) {
+                case 0: x = -size/2 + (pos / perSide) * size; z = -size/2; break;
+                case 1: x = size/2; z = -size/2 + (pos / perSide) * size; break;
+                case 2: x = size/2 - (pos / perSide) * size; z = size/2; break;
+                case 3: x = -size/2; z = size/2 - (pos / perSide) * size; break;
+            }
+            const b = targets[i];
+            if (b.connected) {
+                b.chat(`/tp ${b.username} ${(bot.x || 0) + x} 65 ${(bot.z || 0) + z}`);
+            }
+        }
+        bot.chat(`✅ Square: ${count} bots!`);
+    }
+
+    cmdGrid(bot, args) {
+        const targets = this.getTargetBots(bot);
+        const cols = parseInt(args[0]) || 10;
+        const spacing = parseFloat(args[1]) || 3;
+        
+        for (let i = 0; i < targets.length && i < 100; i++) {
+            const row = Math.floor(i / cols);
+            const col = i % cols;
+            const b = targets[i];
+            if (b.connected) {
+                const x = (bot.x || 0) + (col - cols/2) * spacing;
+                const z = (bot.z || 0) + row * spacing;
+                b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+            }
+        }
+        bot.chat(`✅ Grid!`);
+    }
+
+    cmdDiamond(bot, args) {
+        const targets = this.getTargetBots(bot);
+        const size = parseFloat(args[0]) || 15;
+        
+        for (let i = 0; i < targets.length && i < 50; i++) {
+            const angle = (2 * Math.PI * i) / targets.length;
+            const r = size * Math.abs(Math.sin(2 * angle));
+            const x = (bot.x || 0) + r * Math.cos(angle);
+            const z = (bot.z || 0) + r * Math.sin(angle);
+            const b = targets[i];
+            if (b.connected) {
+                b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+            }
+        }
+        bot.chat(`✅ Diamond!`);
+    }
+
+    cmdSpiral(bot, args) {
+        const targets = this.getTargetBots(bot);
+        const radius = parseFloat(args[0]) || 20;
+        const turns = parseFloat(args[1]) || 3;
+        
+        for (let i = 0; i < targets.length && i < 50; i++) {
+            const t = i / targets.length;
+            const r = radius * t;
+            const angle = 2 * Math.PI * turns * t;
+            const x = (bot.x || 0) + r * Math.cos(angle);
+            const z = (bot.z || 0) + r * Math.sin(angle);
+            const b = targets[i];
+            if (b.connected) {
+                b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+            }
+        }
+        bot.chat(`✅ Spiral!`);
+    }
+
+    // ============================================
+    // COMMANDS - PVP / ATTACK
+    // ============================================
+    
     cmdAttack(bot, args) {
         let target = null;
         if (args[0]) {
@@ -456,18 +599,69 @@ Runner: ${this.runnerId}`;
             const targets = this.getTargetBots(bot);
             for (const b of targets.slice(0, 20)) {
                 if (b.connected) {
-                    const x = (target.x || 0) + (Math.random() - 0.5) * 6;
-                    const z = (target.z || 0) + (Math.random() - 0.5) * 6;
+                    const x = (target.x || 0) + (Math.random() - 0.5) * 4;
+                    const z = (target.z || 0) + (Math.random() - 0.5) * 4;
                     b.chat(`/tp ${b.username} ${x} 65 ${z}`);
                     b.chat(`/me attacks ${target.username}! ⚔️`);
                 }
             }
             bot.chat(`⚔️ Attacking ${target.username}!`);
         } else {
-            bot.chat('❌ No target found');
+            bot.chat('❌ No target');
         }
     }
 
+    cmdPvp(bot, args) {
+        this.cmdAttack(bot, args);
+    }
+
+    cmdFight(bot, args) {
+        this.cmdAttack(bot, args);
+    }
+
+    cmdKill(bot, args) {
+        if (!args[0]) {
+            bot.chat('Usage: !kill <username>');
+            return;
+        }
+        const targetName = args[0];
+        for (const b of this.bots) {
+            if (b.username.toLowerCase() === targetName.toLowerCase() && b.connected) {
+                b.chat(`/me kills ${targetName}! 💀`);
+                setTimeout(() => {
+                    b.end();
+                    b.connected = false;
+                    this.totalRemoved++;
+                }, 500);
+                bot.chat(`💀 Killed ${targetName}!`);
+                return;
+            }
+        }
+        bot.chat(`❌ ${targetName} not found`);
+    }
+
+    cmdRemove(bot, args) {
+        if (!args[0]) {
+            bot.chat('Usage: !remove <username>');
+            return;
+        }
+        const targetName = args[0];
+        for (const b of this.bots) {
+            if (b.username.toLowerCase() === targetName.toLowerCase() && b.connected) {
+                b.end();
+                b.connected = false;
+                this.totalRemoved++;
+                bot.chat(`✅ Removed ${targetName}`);
+                return;
+            }
+        }
+        bot.chat(`❌ ${targetName} not found`);
+    }
+
+    // ============================================
+    // COMMANDS - ACTIONS
+    // ============================================
+    
     cmdDance(bot, args) {
         const targets = this.getTargetBots(bot);
         const moves = [[1,0,0], [-1,0,0], [0,0,1], [0,0,-1]];
@@ -492,7 +686,45 @@ Runner: ${this.runnerId}`;
         bot.chat('👋 Wave!');
     }
 
-    // ----- CHAT -----
+    cmdJump(bot, args) {
+        const targets = this.getTargetBots(bot);
+        for (const b of targets.slice(0, 20)) {
+            if (b.connected) {
+                b.chat('/me jumps! 🦘');
+                b.chat(`/tp ${b.username} ${b.x || 0} 70 ${b.z || 0}`);
+            }
+        }
+        bot.chat('🦘 Jump!');
+    }
+
+    cmdSpin(bot, args) {
+        const targets = this.getTargetBots(bot);
+        for (const b of targets.slice(0, 20)) {
+            if (b.connected) b.chat('/me spins! 🔄');
+        }
+        bot.chat('🔄 Spin!');
+    }
+
+    cmdBow(bot, args) {
+        const targets = this.getTargetBots(bot);
+        for (const b of targets.slice(0, 20)) {
+            if (b.connected) b.chat('/me bows! 🙇');
+        }
+        bot.chat('🙇 Bow!');
+    }
+
+    cmdSalute(bot, args) {
+        const targets = this.getTargetBots(bot);
+        for (const b of targets.slice(0, 20)) {
+            if (b.connected) b.chat('/me salutes! 🫡');
+        }
+        bot.chat('🫡 Salute!');
+    }
+
+    // ============================================
+    // COMMANDS - CHAT
+    // ============================================
+    
     cmdSay(bot, args) {
         if (args.length === 0) {
             bot.chat('Usage: !say <message>');
@@ -518,46 +750,44 @@ Runner: ${this.runnerId}`;
         bot.chat(`📢 Broadcast: ${msg}`);
     }
 
-    // ----- CONTROL -----
-    cmdRemove(bot, args) {
-        if (!args[0]) {
-            bot.chat('Usage: !remove <username>');
+    cmdWhisper(bot, args) {
+        if (args.length < 2) {
+            bot.chat('Usage: !whisper <player> <message>');
             return;
         }
         const targetName = args[0];
+        const msg = args.slice(1).join(' ');
+        let target = null;
         for (const b of this.bots) {
             if (b.username.toLowerCase() === targetName.toLowerCase() && b.connected) {
-                b.end();
-                b.connected = false;
-                this.totalRemoved++;
-                bot.chat(`✅ Removed ${targetName}`);
-                return;
+                target = b;
+                break;
             }
         }
-        bot.chat(`❌ Bot ${targetName} not found`);
-    }
-
-    cmdKill(bot, args) { this.cmdRemove(bot, args); }
-
-    cmdJoin(bot, args) {
-        const count = parseInt(args[0]) || 10;
-        bot.chat(`🔄 Joining ${count} more bots...`);
-        for (let i = 0; i < count; i++) {
-            setTimeout(() => this.spawnBot(), i * 1000);
+        if (target) {
+            target.chat(`🤫 ${bot.username}: ${msg}`);
+            bot.chat(`✅ Whispered to ${targetName}`);
+        } else {
+            bot.chat(`❌ ${targetName} not found`);
         }
     }
 
-    cmdLeave(bot, args) {
-        bot.chat('👋 Leaving...');
-        setTimeout(() => { bot.end(); }, 1000);
+    cmdAnnounce(bot, args) {
+        if (args.length === 0) {
+            bot.chat('Usage: !announce <message>');
+            return;
+        }
+        const msg = args.join(' ');
+        for (const b of this.bots) {
+            if (b.connected) b.chat(`📣 ${msg}`);
+        }
+        bot.chat(`📣 Announce: ${msg}`);
     }
 
-    cmdCount(bot, args) {
-        const active = this.bots.filter(b => b.connected).length;
-        bot.chat(`📊 Total: ${this.bots.length} | Active: ${active} | Removed: ${this.totalRemoved}`);
-    }
-
-    // ----- FORMATIONS -----
+    // ============================================
+    // COMMANDS - FORMATIONS
+    // ============================================
+    
     cmdHeart(bot, args) {
         const targets = this.getTargetBots(bot);
         const count = Math.min(targets.length, 40);
@@ -604,91 +834,59 @@ Runner: ${this.runnerId}`;
         bot.chat('✅ V-Formation!');
     }
 
-    // ============================================
-    // HELPERS
-    // ============================================
-    getTargetBots(bot) {
-        if (this.selectedBots.size === 0) {
-            return this.bots.filter(b => b.connected && b.botId !== bot.botId);
-        }
-        return this.bots.filter(b => 
-            this.selectedBots.has(b.botId) && b.connected && b.botId !== bot.botId
-        );
-    }
-
-    displayStatus() {
-        const active = this.bots.filter(b => b.connected).length;
-        console.log(`📊 STATUS: ${active}/${this.bots.length} active | Selected: ${this.selectedBots.size} | Runner: ${this.runnerId}`);
-    }
-
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    // ============================================
-    // SPAWN ALL BOTS
-    // ============================================
-    async spawnAllBots() {
-        const maxBots = Math.min(config.bots_per_runner, config.max_bots);
-        let spawned = 0;
-
-        console.log('='.repeat(60));
-        console.log(`🚀 BOT SYSTEM`);
-        console.log(`🏷️ Runner: ${this.runnerId}`);
-        console.log(`🎯 Server: ${config.server_ip}:${config.server_port}`);
-        console.log(`🤖 Bots: ${maxBots}`);
-        console.log('='.repeat(60));
-
-        for (let i = 0; i < maxBots * 2 && spawned < maxBots; i++) {
-            const success = await this.spawnBot();
-            if (success) {
-                spawned++;
-                await this.sleep(config.bot_spawn_delay);
-            } else {
-                console.log(`⚠️ Retry ${i + 1}`);
-                await this.sleep(2000);
+    cmdXFormation(bot, args) {
+        const targets = this.getTargetBots(bot);
+        const count = Math.min(targets.length, 30);
+        for (let i = 0; i < count; i++) {
+            const t = i / count;
+            const x1 = (bot.x || 0) - t * 20 + 10;
+            const x2 = (bot.x || 0) + t * 20 - 10;
+            const z = (bot.z || 0) + i * 1.5;
+            const b = targets[i];
+            if (b.connected) {
+                const x = i % 2 === 0 ? x1 : x2;
+                b.chat(`/tp ${b.username} ${x} 65 ${z}`);
             }
         }
+        bot.chat('✅ X-Formation!');
+    }
 
-        console.log(`✅ Spawned ${spawned} bots!`);
+    cmdArrow(bot, args) {
+        const targets = this.getTargetBots(bot);
+        const count = Math.min(targets.length, 25);
+        for (let i = 0; i < count; i++) {
+            const row = Math.floor(i / 5);
+            const col = i % 5;
+            const x = (bot.x || 0) + (col - 2) * 2;
+            const z = (bot.z || 0) + row * 3;
+            const b = targets[i];
+            if (b.connected) {
+                b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+            }
+        }
+        bot.chat('🏹 Arrow!');
+    }
+
+    cmdCross(bot, args) {
+        const targets = this.getTargetBots(bot);
+        const count = Math.min(targets.length, 20);
+        for (let i = 0; i < count; i++) {
+            const t = i / count;
+            const x = (bot.x || 0) + (t - 0.5) * 20;
+            const z = (bot.z || 0) + (i % 2 === 0 ? 0 : (t - 0.5) * 15);
+            const b = targets[i];
+            if (b.connected) {
+                b.chat(`/tp ${b.username} ${x} 65 ${z}`);
+            }
+        }
+        bot.chat('✝️ Cross!');
     }
 
     // ============================================
-    // START
+    // COMMANDS - CONTROL
     // ============================================
-    async start() {
-        await this.spawnAllBots();
-
-        process.on('SIGINT', () => {
-            console.log('\n🛑 Shutting down...');
-            for (const bot of this.bots) {
-                if (bot.connected) bot.end();
-            }
-            process.exit();
-        });
-
-        process.on('SIGTERM', () => {
-            console.log('\n🛑 Shutting down...');
-            for (const bot of this.bots) {
-                if (bot.connected) bot.end();
-            }
-            process.exit();
-        });
-        
-        return new Promise(() => {});
-    }
-}
-
-// ============================================
-// RUN
-// ============================================
-const manager = new BotManager();
-
-process.on('uncaughtException', (err) => {
-    console.log('⚠️ Error:', err.message);
-});
-
-manager.start().catch((err) => {
-    console.error('❌ Fatal:', err);
-    process.exit(1);
-});
+    
+    cmdJoin(bot, args) {
+        const count = parseInt(args[0]) || 10;
+        bot.chat(`🔄 Joining ${count} more bots...`);
+        for (let i = 0
