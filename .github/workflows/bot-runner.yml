@@ -1,0 +1,94 @@
+name: Minecraft Bot Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      runners_count:
+        description: 'Number of runners to spawn'
+        required: true
+        default: '5'
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+          - '4'
+          - '5'
+          - '10'
+
+jobs:
+  bot_runner:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runner: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      max-parallel: 10
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+            
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Create config
+        run: |
+          cat > config.json << 'EOF'
+          {
+            "server_ip": "node.harshteotia.in",
+            "server_port": 25566,
+            "username_prefix": "Bot",
+            "bots_per_runner": 100,
+            "bot_spawn_delay": 0.2,
+            "enable_auto_reconnect": true,
+            "video_helper_mode": true,
+            "command_prefix": "!",
+            "max_bots": 100,
+            "registration_password": null,
+            "server_version": "1.16.5"
+          }
+          EOF
+          
+      - name: Set runner ID
+        run: |
+          echo "RUNNER_ID=${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}_${GITHUB_JOB}_${{ matrix.runner }}" >> $GITHUB_ENV
+          
+      - name: Create bot script
+        run: |
+          cat > bot_controller.py << 'EOF'
+          # Copy the bot_controller.py content here
+          # (Full script content from above)
+          EOF
+          
+      - name: Run bot
+        env:
+          RUNNER_ID: ${{ env.RUNNER_ID }}
+          PYTHONUNBUFFERED: 1
+        run: |
+          echo "Starting bot runner ${{ matrix.runner }}"
+          echo "Runner ID: ${{ env.RUNNER_ID }}"
+          python bot_controller.py
+          
+      - name: Keep runner alive
+        if: always()
+        run: |
+          # Keep the runner active
+          while true; do
+            sleep 60
+            echo "Runner ${{ matrix.runner }} is still alive"
+          done
