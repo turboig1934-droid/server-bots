@@ -1,7 +1,6 @@
 const mineflayer = require('mineflayer');
 const fs = require('fs');
 const path = require('path');
-const readline = require('readline');
 const crypto = require('crypto');
 
 // Configuration
@@ -56,7 +55,9 @@ class MinecraftBotManager {
             'info': this.handleInfo.bind(this),
             'clear': this.handleClear.bind(this),
             'join': this.handleJoin.bind(this),
-            'leave': this.handleLeave.bind(this)
+            'leave': this.handleLeave.bind(this),
+            'tp': this.handleTp.bind(this),
+            'list': this.handleList.bind(this)
         };
     }
 
@@ -150,6 +151,7 @@ class MinecraftBotManager {
                 bot.y = 64;
                 bot.z = Math.random() * 40 - 20;
                 bot.connected = true;
+                bot.registered = false;
                 
                 this.bots.push(bot);
                 
@@ -363,7 +365,9 @@ class MinecraftBotManager {
 !follow <player> - Follow player
 !spread - Spread out bots
 !info - Show bot info
-!clear - Clear selected`;
+!clear - Clear selected
+!list - List all bots
+!tp <x> <y> <z> - Teleport bot`;
         bot.chat(help);
     }
 
@@ -371,6 +375,31 @@ class MinecraftBotManager {
         const active = this.bots.filter(b => b.connected).length;
         const selected = this.selectedBots.size;
         bot.chat(`Total: ${this.bots.length} | Active: ${active} | Selected: ${selected} | Joined: ${this.totalJoined} | Removed: ${this.totalRemoved}`);
+    }
+
+    handleList(bot, args) {
+        const botList = this.bots
+            .filter(b => b.connected)
+            .map(b => b.username)
+            .join(', ');
+        bot.chat(`Connected bots: ${botList || 'None'}`);
+    }
+
+    handleTp(bot, args) {
+        try {
+            const parts = args.split(' ');
+            if (parts.length === 3) {
+                const x = parseFloat(parts[0]);
+                const y = parseFloat(parts[1]);
+                const z = parseFloat(parts[2]);
+                bot.chat(`/tp ${bot.username} ${x} ${y} ${z}`);
+                bot.chat(`Teleported to (${x}, ${y}, ${z})`);
+            } else {
+                bot.chat('Usage: !tp <x> <y> <z>');
+            }
+        } catch (e) {
+            bot.chat('Invalid coordinates');
+        }
     }
 
     handleCircle(bot, args) {
