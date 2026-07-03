@@ -1,14 +1,7 @@
 {
-    "name": "ultra-minecraft-bots",
-    "version": "2.0.0",
-    "description": "Ultimate Minecraft bot system with full chat control",
-    "main": "bot.js",
-    "scripts": {
-        "start": "node bot.js",
-        "dev": "nodemon bot.js"
-    },
+    "name": "minecraft-bots",
+    "version": "1.0.0",
     "dependencies": {
-        "mineflayer": "^4.19.0",
-        "fs": "^0.0.1-security"
+        "mineflayer": "^4.19.0"
     }
 }
