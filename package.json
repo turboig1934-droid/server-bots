@@ -1,0 +1,17 @@
+{
+    "name": "minecraft-bot-system",
+    "version": "1.0.0",
+    "description": "Minecraft bot system for video creation",
+    "main": "bot.js",
+    "scripts": {
+        "start": "node bot.js",
+        "test": "node test.js"
+    },
+    "dependencies": {
+        "mineflayer": "^4.19.0",
+        "minecraft-protocol": "^1.45.0"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.0"
+    }
+}
