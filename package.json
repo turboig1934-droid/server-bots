@@ -9,8 +9,5 @@
     },
     "dependencies": {
         "mineflayer": "^4.19.0"
-    },
-    "devDependencies": {
-        "nodemon": "^3.0.0"
     }
 }
